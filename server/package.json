@@ -1,0 +1,31 @@
+{
+  "name": "salesforce-agentforce-march-madness",
+  "version": "1.0.0",
+  "description": "An Express server handling backend needs for the Agentforce March Madness demo.",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "node --env-file=./src/.env --watch src/index.ts",
+    "start": "node src/index.ts"
+  },
+  "keywords": [
+    "agentforce",
+    "salesforce",
+    "data cloud",
+    "data360",
+    "heroku",
+    "AppLink"
+  ],
+  "author": "Matija Vrzan",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@heroku/applink": "^1.0.2",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
+  }
+}
