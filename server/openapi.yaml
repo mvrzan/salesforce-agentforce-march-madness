@@ -1,0 +1,316 @@
+openapi: 3.0.3
+info:
+  title: March Madness Agentforce Tools API
+  description: >
+    Agent Action endpoints consumed by Salesforce Agentforce.
+    All routes are authenticated via Heroku AppLink / Salesforce middleware.
+  version: 1.0.0
+
+paths:
+  /api/v1/agentforce/results/teams:
+    get:
+      operationId: getTeams
+      summary: Get all tournament teams
+      description: >
+        Returns all 64 teams in the current NCAA Tournament field.
+        Derived from live ESPN data when available, otherwise falls back to
+        the 2025 static bracket.
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: "A2AConnectedApp"
+      responses:
+        "200":
+          description: List of tournament teams
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamsResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agentforce/results/bracket:
+    get:
+      operationId: getBracketStructure
+      summary: Get full bracket structure
+      description: >
+        Returns the complete bracket with all rounds and matchups.
+        Uses live ESPN data when the tournament is active (≥32 Round of 64 games
+        published), otherwise returns the 2025 static fallback bracket.
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: "A2AConnectedApp"
+      responses:
+        "200":
+          description: Full bracket structure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BracketResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/agentforce/results/live:
+    get:
+      operationId: getLiveScores
+      summary: Get live game scores
+      description: >
+        Returns current in-progress and recently completed games from the
+        ESPN scoreboard.
+      x-sfdc:
+        heroku:
+          authorization:
+            connectedApp: "A2AConnectedApp"
+      responses:
+        "200":
+          description: List of live and completed matchups
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiveScoresResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    Region:
+      type: string
+      enum:
+        - East
+        - West
+        - South
+        - Midwest
+      description: NCAA Tournament region
+
+    Round:
+      type: string
+      enum:
+        - Round of 64
+        - Round of 32
+        - Sweet 16
+        - Elite 8
+        - Final Four
+        - Championship
+      description: Tournament round name
+
+    Team:
+      type: object
+      required:
+        - id
+        - name
+        - shortName
+        - abbreviation
+        - seed
+        - region
+      properties:
+        id:
+          type: string
+          description: ESPN team ID
+          example: "150"
+        name:
+          type: string
+          description: Full team name
+          example: "Duke Blue Devils"
+        shortName:
+          type: string
+          description: Short display name
+          example: "Duke"
+        abbreviation:
+          type: string
+          description: Team abbreviation
+          example: "DUKE"
+        seed:
+          type: integer
+          description: Tournament seed (1–16)
+          example: 1
+        region:
+          $ref: "#/components/schemas/Region"
+        record:
+          type: string
+          description: Win-loss record
+          example: "35-4"
+        logo:
+          type: string
+          format: uri
+          description: ESPN team logo URL
+          example: "https://a.espncdn.com/i/teamlogos/ncaa/500/150.png"
+        espnId:
+          type: string
+          description: ESPN team ID (mirrors id)
+          example: "150"
+
+    Matchup:
+      type: object
+      required:
+        - id
+        - round
+        - region
+        - topTeam
+        - bottomTeam
+        - winner
+        - isComplete
+        - isLive
+      properties:
+        id:
+          type: string
+          description: Matchup ID (ESPN event ID when live, or static slot ID)
+          example: "401638636"
+        round:
+          $ref: "#/components/schemas/Round"
+        region:
+          type: string
+          description: Region or stage of this matchup
+          example: "East"
+        topTeam:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Team"
+          description: Higher-seeded team (or null if not yet determined)
+        bottomTeam:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Team"
+          description: Lower-seeded team (or null if not yet determined)
+        winner:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/Team"
+          description: Winning team, or null if game not yet complete
+        topScore:
+          type: integer
+          description: Score for the top team (present when live or complete)
+          example: 78
+        bottomScore:
+          type: integer
+          description: Score for the bottom team (present when live or complete)
+          example: 65
+        isComplete:
+          type: boolean
+          description: Whether the game has finished
+        isLive:
+          type: boolean
+          description: Whether the game is currently in progress
+        gameTime:
+          type: string
+          description: Game time or status detail
+          example: "Final"
+        espnEventId:
+          type: string
+          description: ESPN event ID
+          example: "401638636"
+
+    BracketRound:
+      type: object
+      required:
+        - round
+        - matchups
+      properties:
+        round:
+          $ref: "#/components/schemas/Round"
+        matchups:
+          type: array
+          items:
+            $ref: "#/components/schemas/Matchup"
+
+    Bracket:
+      type: object
+      required:
+        - id
+        - rounds
+        - createdAt
+        - updatedAt
+        - type
+      properties:
+        id:
+          type: string
+          description: >
+            Bracket identifier. "bracket-live" when sourced from ESPN live data,
+            "bracket-2025-static" for the fallback bracket.
+          example: "bracket-live"
+        rounds:
+          type: array
+          items:
+            $ref: "#/components/schemas/BracketRound"
+          description: All six rounds in order from Round of 64 to Championship
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        type:
+          type: string
+          enum:
+            - user
+            - ai
+            - real
+          description: Bracket type — always "real" for these endpoints
+        score:
+          type: integer
+          description: Optional score when compared against real results
+
+    TeamsResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+
+    BracketResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: "#/components/schemas/Bracket"
+
+    LiveScoresResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Matchup"
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Internal server error"
