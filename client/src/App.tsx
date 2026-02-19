@@ -1,35 +1,27 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BracketProvider } from "./context/BracketContext";
+import NavBar from "./components/NavBar";
+import HomePage from "./pages/HomePage";
+import BracketPage from "./pages/BracketPage";
+import AIBracketPage from "./pages/AIBracketPage";
+import ComparePage from "./pages/ComparePage";
+import LivePage from "./pages/LivePage";
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+const App = () => (
+  <BracketProvider>
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-950">
+        <NavBar />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/bracket" element={<BracketPage />} />
+          <Route path="/ai-bracket" element={<AIBracketPage />} />
+          <Route path="/compare" element={<ComparePage />} />
+          <Route path="/live" element={<LivePage />} />
+        </Routes>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    </BrowserRouter>
+  </BracketProvider>
+);
 
-export default App
+export default App;
