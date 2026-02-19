@@ -23,6 +23,9 @@ export const useSSE = (options: UseSSEOptions = {}) => {
 
   const abortRef = useRef<AbortController | null>(null);
   const contentRef = useRef("");
+  // Keep a stable ref to the latest options so useCallback deps stay empty
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const reset = useCallback(() => {
     contentRef.current = "";
@@ -55,7 +58,7 @@ export const useSSE = (options: UseSSEOptions = {}) => {
 
         if (done) {
           setState((prev) => ({ ...prev, isStreaming: false, isDone: true }));
-          options.onDone?.(contentRef.current);
+          optionsRef.current.onDone?.(contentRef.current);
           break;
         }
 
@@ -68,7 +71,7 @@ export const useSSE = (options: UseSSEOptions = {}) => {
             const data = line.slice(5).trim();
             if (data === "[DONE]") {
               setState((prev) => ({ ...prev, isStreaming: false, isDone: true }));
-              options.onDone?.(contentRef.current);
+              optionsRef.current.onDone?.(contentRef.current);
               return;
             }
 
@@ -110,12 +113,12 @@ export const useSSE = (options: UseSSEOptions = {}) => {
               if (chunk === null) continue;
 
               contentRef.current += chunk;
-              options.onChunk?.(chunk);
+              optionsRef.current.onChunk?.(chunk);
               setState((prev) => ({ ...prev, content: contentRef.current }));
             } catch {
               // Raw text chunk
               contentRef.current += data;
-              options.onChunk?.(data);
+              optionsRef.current.onChunk?.(data);
               setState((prev) => ({ ...prev, content: contentRef.current }));
             }
           }
@@ -124,7 +127,7 @@ export const useSSE = (options: UseSSEOptions = {}) => {
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       const msg = err instanceof Error ? err.message : "Stream error";
-      options.onError?.(msg);
+      optionsRef.current.onError?.(msg);
       setState((prev) => ({ ...prev, isStreaming: false, error: msg }));
     }
   }, []);
