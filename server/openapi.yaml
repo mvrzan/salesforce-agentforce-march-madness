@@ -15,6 +15,13 @@ paths:
         Returns all 64 teams in the current NCAA Tournament field.
         Derived from live ESPN data when available, otherwise falls back to
         the 2025 static bracket.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional search query (UI compatibility parameter)
       x-sfdc:
         heroku:
           authorization:
@@ -41,6 +48,13 @@ paths:
         Returns the complete bracket with all rounds and matchups.
         Uses live ESPN data when the tournament is active (≥32 Round of 64 games
         published), otherwise returns the 2025 static fallback bracket.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional search query (UI compatibility parameter)
       x-sfdc:
         heroku:
           authorization:
@@ -66,6 +80,13 @@ paths:
       description: >
         Returns current in-progress and recently completed games from the
         ESPN scoreboard.
+      parameters:
+        - name: query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional search query (UI compatibility parameter)
       x-sfdc:
         heroku:
           authorization:
