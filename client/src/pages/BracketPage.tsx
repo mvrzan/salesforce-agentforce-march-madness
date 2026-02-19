@@ -12,14 +12,20 @@ const BracketPage = () => {
   useEffect(() => {
     if (state.realBracket) return;
 
-    dispatch({ type: "SET_LOADING_BRACKET", payload: true });
-    getBracketStructure()
-      .then((res) => {
+    const loadBracket = async () => {
+      dispatch({ type: "SET_LOADING_BRACKET", payload: true });
+      try {
+        const res = await getBracketStructure();
         if (res.success) dispatch({ type: "SET_REAL_BRACKET", payload: res.data });
-      })
-      .catch((err: Error) => dispatch({ type: "SET_ERROR", payload: err.message }))
-      .finally(() => dispatch({ type: "SET_LOADING_BRACKET", payload: false }));
-  }, []);
+      } catch (err) {
+        dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "Failed to load bracket" });
+      } finally {
+        dispatch({ type: "SET_LOADING_BRACKET", payload: false });
+      }
+    };
+
+    void loadBracket();
+  }, [dispatch, state.realBracket]);
 
   const handlePick = (matchupId: string, winner: Team) => {
     makePick(matchupId, winner);
