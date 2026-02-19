@@ -73,8 +73,42 @@ export const useSSE = (options: UseSSEOptions = {}) => {
             }
 
             try {
-              const parsed = JSON.parse(data) as { type?: string; content?: string; text?: string };
-              const chunk = parsed.content ?? parsed.text ?? data;
+              const parsed = JSON.parse(data) as {
+                type?: string;
+                content?: string;
+                text?: string;
+                value?: string;
+                delta?: string | { text?: string };
+                message?: {
+                  type?: string;
+                  message?: string;
+                  id?: string;
+                  content?: { type?: string; staticContent?: { format?: string; text?: string } }[];
+                };
+                data?: { type?: string; text?: string; message?: string; value?: string };
+                messages?: { type?: string; text?: string; message?: string }[];
+              };
+
+              const chunk =
+                // Agentforce: { message: { type: "TextChunk", message: "..." } }
+                parsed.message?.message ??
+                // Agentforce: { message: { content: [{ staticContent: { text } }] } }
+                parsed.message?.content?.[0]?.staticContent?.text ??
+                // Generic / fallback shapes
+                parsed.content ??
+                parsed.text ??
+                parsed.value ??
+                (typeof parsed.delta === "string" ? parsed.delta : parsed.delta?.text) ??
+                parsed.data?.text ??
+                parsed.data?.message ??
+                parsed.data?.value ??
+                parsed.messages?.[0]?.text ??
+                parsed.messages?.[0]?.message ??
+                null;
+
+              // Skip chunks with no extractable text (e.g. metadata/control events)
+              if (chunk === null) continue;
+
               contentRef.current += chunk;
               options.onChunk?.(chunk);
               setState((prev) => ({ ...prev, content: contentRef.current }));
