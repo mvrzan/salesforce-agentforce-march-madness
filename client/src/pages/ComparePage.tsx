@@ -62,9 +62,6 @@ const ComparePage = () => {
   const hasUserBracket = !!state.userBracket;
   const hasAIBracket = !!state.aiBracket;
 
-  // Scoring only makes sense once real games have been played
-  const hasRealResults = state.realBracket?.rounds.some((r) => r.matchups.some((m) => m.winner != null)) ?? false;
-
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-12">
       {/* Header */}
@@ -73,16 +70,13 @@ const ComparePage = () => {
           <h1 className="text-2xl font-black text-white">⚖️ Compare</h1>
           <p className="text-sm text-gray-400 mt-0.5">Your bracket vs Agentforce, measured against real results</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <button
-            onClick={handleScore}
-            disabled={!hasRealResults || (!hasUserBracket && !hasAIBracket)}
-            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
-          >
-            Calculate Scores
-          </button>
-          {!hasRealResults && <p className="text-xs text-gray-500">Scores available once the tournament begins</p>}
-        </div>
+        <button
+          onClick={handleScore}
+          disabled={!state.realBracket || (!hasUserBracket && !hasAIBracket)}
+          className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+        >
+          Calculate Scores
+        </button>
       </div>
 
       {/* Score bar */}
