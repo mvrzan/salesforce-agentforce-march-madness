@@ -25,6 +25,8 @@ app.use(agentforceApiRoutes);
 app.use(resultsRoutes);
 app.use(bracketRoutes);
 
+app.use(express.static("public"));
+
 // Centralized error handler — must be last
 app.use(errorHandler);
 
