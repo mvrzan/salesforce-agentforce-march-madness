@@ -48,6 +48,7 @@ const AIBracketPage = () => {
   // Restore hasGenerated from persisted AI picks so the bracket shows after a refresh
   const [hasGenerated, setHasGenerated] = useState(() => state.aiPicks.length > 0);
   const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
+  const [isPanelOpen, setIsPanelOpen] = useState(false);
 
   // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
   const aiTextRef = useRef("");
@@ -123,6 +124,8 @@ const AIBracketPage = () => {
       const seqId = sequenceRef.current++;
       const prompt = state.realBracket ? buildBracketPrompt(state.realBracket) : "";
 
+      // Auto-open the reasoning panel when generation starts
+      setIsPanelOpen(true);
       const fetchPromise = sendStreamingMessage(agentSessionId, prompt, seqId);
       await stream(fetchPromise);
     } catch (err) {
@@ -160,6 +163,14 @@ const AIBracketPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {(hasGenerated || isStreaming) && (
+            <button
+              onClick={() => setIsPanelOpen((o) => !o)}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              {isPanelOpen ? "Hide Reasoning" : "🤖 Show Reasoning"}
+            </button>
+          )}
           <button
             onClick={handleGenerate}
             disabled={isGenerating || isStreaming}
@@ -170,31 +181,27 @@ const AIBracketPage = () => {
         </div>
       </div>
 
-      {/* Split layout */}
-      <div className="max-w-screen-2xl mx-auto px-4 flex gap-4" style={{ minHeight: "calc(100vh - 140px)" }}>
-        {/* Bracket – 65% */}
-        <div className="flex-1 overflow-auto">
-          <BracketTree
-            bracket={state.aiBracket ?? state.realBracket}
-            realBracket={state.realBracket}
-            isReadOnly
-            label="AI Picks"
-          />
-          {!hasGenerated && !isGenerating && (
-            <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
-              Click "Generate AI Bracket" to let Agentforce analyze the field
-            </div>
-          )}
-        </div>
+      {/* Bracket – full width */}
+      <div className="max-w-screen-2xl mx-auto px-4">
+        <BracketTree
+          bracket={state.aiBracket ?? state.realBracket}
+          realBracket={state.realBracket}
+          isReadOnly
+          label="AI Picks"
+        />
+        {!hasGenerated && !isGenerating && (
+          <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
+            Click &quot;Generate AI Bracket&quot; to let Agentforce analyze the field
+          </div>
+        )}
+      </div>
 
-        {/* Reasoning panel – 35% */}
-        <div
-          className="w-80 xl:w-96 shrink-0 flex flex-col"
-          style={{ height: "calc(100vh - 140px)", position: "sticky", top: "56px" }}
-        >
+      {/* Reasoning panel – fixed right overlay, never squeezes the bracket */}
+      {isPanelOpen && (
+        <div className="fixed right-0 top-14 bottom-0 w-96 z-40 flex flex-col shadow-2xl">
           <ReasoningPanel content={content} isStreaming={isStreaming} error={error} title="Agentforce Reasoning" />
         </div>
-      </div>
+      )}
     </div>
   );
 };
