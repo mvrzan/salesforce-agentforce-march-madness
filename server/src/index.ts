@@ -2,14 +2,17 @@ import express from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import { getCurrentTimestamp } from "./utils/loggingUtil.ts";
+import { errorHandler } from "./middleware/errorHandler.ts";
+import agentforceApiRoutes from "./routes/agentforceApi.ts";
+import resultsRoutes from "./routes/resultsRoutes.ts";
+import bracketRoutes from "./routes/bracketRoutes.ts";
 
 const app = express();
 const port = process.env.APP_PORT || process.env.PORT || 3000;
-const baseUrl = process.env.APP_URL || `http://localhost:${port}`;
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
     credentials: true,
   }),
 );
@@ -17,6 +20,14 @@ app.use(
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Routes
+app.use(agentforceApiRoutes);
+app.use(resultsRoutes);
+app.use(bracketRoutes);
+
+// Centralized error handler — must be last
+app.use(errorHandler);
+
 app.listen(port, () => {
-  console.log(`${getCurrentTimestamp()} 🎬 - index - Authentication server listening on port: ${port}`);
+  console.log(`${getCurrentTimestamp()} 🎬 - index - Server listening on port: ${port}`);
 });
