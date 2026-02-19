@@ -1,5 +1,25 @@
-import { createContext, useContext, useReducer, type Dispatch, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
 import { type Bracket, type PickPayload, type Matchup, type Team, ROUND_ORDER } from "../types/tournament";
+
+const STORAGE_KEY_SESSION = "mm-session-id";
+const STORAGE_KEY_PICKS = "mm-user-picks";
+
+const getOrCreateSessionId = (): string => {
+  const stored = localStorage.getItem(STORAGE_KEY_SESSION);
+  if (stored) return stored;
+  const newId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  localStorage.setItem(STORAGE_KEY_SESSION, newId);
+  return newId;
+};
+
+const loadStoredPicks = (): PickPayload[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PICKS);
+    return raw ? (JSON.parse(raw) as PickPayload[]) : [];
+  } catch {
+    return [];
+  }
+};
 
 interface BracketState {
   userBracket: Bracket | null;
@@ -59,16 +79,14 @@ const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   return { ...updated, updatedAt: new Date().toISOString() };
 };
 
-const generateSessionId = () => `session-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
 const initialState: BracketState = {
   userBracket: null,
   aiBracket: null,
   realBracket: null,
   liveMatchups: [],
-  sessionId: generateSessionId(),
+  sessionId: getOrCreateSessionId(),
   aiSessionId: null,
-  userPicks: [],
+  userPicks: loadStoredPicks(),
   isLoadingBracket: false,
   isLoadingAI: false,
   error: null,
@@ -76,12 +94,18 @@ const initialState: BracketState = {
 
 const bracketReducer = (state: BracketState, action: BracketAction): BracketState => {
   switch (action.type) {
-    case "SET_REAL_BRACKET":
+    case "SET_REAL_BRACKET": {
+      // If we have stored picks, re-apply them to the freshly loaded bracket structure
+      let restoredBracket: Bracket = { ...action.payload, id: state.sessionId, type: "user" };
+      if (!state.userBracket && state.userPicks.length > 0) {
+        restoredBracket = state.userPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), restoredBracket);
+      }
       return {
         ...state,
         realBracket: action.payload,
-        userBracket: state.userBracket ?? { ...action.payload, id: state.sessionId, type: "user" },
+        userBracket: state.userBracket ?? restoredBracket,
       };
+    }
     case "SET_USER_BRACKET":
       return { ...state, userBracket: action.payload };
     case "SET_AI_BRACKET":
@@ -116,6 +140,11 @@ const BracketContext = createContext<BracketContextValue | null>(null);
 
 export const BracketProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(bracketReducer, initialState);
+
+  // Sync picks to localStorage whenever they change so they survive a refresh
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_PICKS, JSON.stringify(state.userPicks));
+  }, [state.userPicks]);
 
   const makePick = (matchupId: string, winner: Team) => {
     dispatch({ type: "ADD_PICK", payload: { matchupId, winnerId: winner.id } });
