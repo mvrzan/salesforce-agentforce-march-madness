@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/errorHandler.ts";
 import agentforceApiRoutes from "./routes/agentforceApi.ts";
 import resultsRoutes from "./routes/resultsRoutes.ts";
 import bracketRoutes from "./routes/bracketRoutes.ts";
+import agentforceTools from "./routes/agentforceTools.ts";
 
 const app = express();
 const port = process.env.APP_PORT || process.env.PORT || 3000;
@@ -24,6 +25,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(agentforceApiRoutes);
 app.use(resultsRoutes);
 app.use(bracketRoutes);
+app.use(agentforceTools);
 
 app.use(express.static("public"));
 
