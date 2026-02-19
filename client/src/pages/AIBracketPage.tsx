@@ -6,26 +6,39 @@ import { useBracket } from "../context/BracketContext";
 import { useSSE } from "../hooks/useSSE";
 import { startAgentSession, deleteAgentSession, sendStreamingMessage } from "../services/api";
 import { getBracketStructure } from "../services/api";
-// import { type Round } from "../types/tournament";
+import { type Bracket, type Region } from "../types/tournament";
 
-const BRACKET_PROMPT = `You are analyzing the 2024 NCAA Men's Basketball Tournament bracket. 
-Based on team seeds, historical performance, key players, coaching strength, and statistical matchups, 
-predict the winner of each matchup.
+const REGIONS: Region[] = ["East", "West", "South", "Midwest"];
+const PICK_PATTERN = /PICK:\s*(\S+)\s*->\s*(\S+)/g;
 
-For each matchup, respond in this exact format:
+const buildBracketPrompt = (bracket: Bracket): string => {
+  const r64 = bracket.rounds.find((r) => r.round === "Round of 64");
+  if (!r64) return "";
+
+  const matchupLines = REGIONS.flatMap((region) => {
+    const matchups = r64.matchups.filter((m) => m.region === region);
+    return [
+      `\n${region} Region:`,
+      ...matchups.map(
+        (m) =>
+          `  MATCHUP_ID: ${m.id} | (${m.topTeam?.seed ?? "?"}) ${m.topTeam?.name ?? "TBD"} [TEAM_ID: ${m.topTeam?.id ?? "?"}] vs (${m.bottomTeam?.seed ?? "?"}) ${m.bottomTeam?.name ?? "TBD"} [TEAM_ID: ${m.bottomTeam?.id ?? "?"}]`,
+      ),
+    ];
+  });
+
+  return `You are analyzing the 2025 NCAA Men's Basketball Tournament bracket.
+Based on team seeds, historical performance, key players, coaching strength, and statistical matchups,
+predict the winner of every Round of 64 matchup.
+
+Here is the bracket with the exact IDs you MUST use:
+${matchupLines.join("\n")}
+
+For EVERY matchup above, respond in this exact format:
 PICK: [MATCHUP_ID] -> [WINNER_TEAM_ID]
 REASON: [Brief 1-2 sentence explanation]
 
-Please analyze and provide picks for Round of 64, starting with the East region.
-Focus on seed-based probability, recent form, and key player matchups.`;
-
-// const ADAPT_PROMPT = (round: Round, results: string) =>
-//   `Round "${round}" has completed. Here are the actual results:
-// ${results}
-
-// Based on these upsets and results, please re-evaluate your remaining predictions.
-// What surprises occurred, and how does this change your outlook for subsequent rounds?
-// Provide updated picks using the same PICK: [ID] -> [WINNER_ID] format.`;
+Use ONLY the exact MATCHUP_ID and TEAM_ID values listed above. Cover all 32 matchups.`;
+};
 
 const AIBracketPage = () => {
   const { state, dispatch } = useBracket();
@@ -35,7 +48,23 @@ const AIBracketPage = () => {
   const [hasGenerated, setHasGenerated] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
 
+  // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
+  const aiTextRef = useRef("");
+  const dispatchedPicksRef = useRef<Set<string>>(new Set());
+
   const { content, isStreaming, error, stream, reset } = useSSE({
+    onChunk: (chunk) => {
+      aiTextRef.current += chunk;
+      const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
+      for (const match of matches) {
+        const matchupId = match[1];
+        const winnerId = match[2];
+        if (!dispatchedPicksRef.current.has(matchupId)) {
+          dispatchedPicksRef.current.add(matchupId);
+          dispatch({ type: "ADD_AI_PICK", payload: { matchupId, winnerId } });
+        }
+      }
+    },
     onDone: () => {
       setIsGenerating(false);
       setHasGenerated(true);
@@ -49,12 +78,16 @@ const AIBracketPage = () => {
   // Load bracket structure if needed
   useEffect(() => {
     if (state.realBracket) return;
-    getBracketStructure()
-      .then((res) => {
+    const load = async () => {
+      try {
+        const res = await getBracketStructure();
         if (res.success) dispatch({ type: "SET_REAL_BRACKET", payload: res.data });
-      })
-      .catch(console.error);
-  }, []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    void load();
+  }, [dispatch, state.realBracket]);
 
   const initSession = async (): Promise<string> => {
     const externalSessionId = uuidv4();
@@ -68,13 +101,17 @@ const AIBracketPage = () => {
 
   const handleGenerate = async () => {
     reset();
+    dispatch({ type: "RESET_AI_BRACKET" });
+    aiTextRef.current = "";
+    dispatchedPicksRef.current.clear();
     setIsGenerating(true);
 
     try {
       const agentSessionId = sessionId ?? (await initSession());
       const seqId = sequenceRef.current++;
+      const prompt = state.realBracket ? buildBracketPrompt(state.realBracket) : "";
 
-      const fetchPromise = sendStreamingMessage(agentSessionId, BRACKET_PROMPT, seqId);
+      const fetchPromise = sendStreamingMessage(agentSessionId, prompt, seqId);
       await stream(fetchPromise);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start AI session";
