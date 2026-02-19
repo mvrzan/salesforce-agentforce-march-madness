@@ -3,6 +3,7 @@ import { type Bracket, type PickPayload, type Matchup, type Team, ROUND_ORDER } 
 
 const STORAGE_KEY_SESSION = "mm-session-id";
 const STORAGE_KEY_PICKS = "mm-user-picks";
+const STORAGE_KEY_AI_PICKS = "mm-ai-picks";
 
 const getOrCreateSessionId = (): string => {
   const stored = localStorage.getItem(STORAGE_KEY_SESSION);
@@ -21,6 +22,15 @@ const loadStoredPicks = (): PickPayload[] => {
   }
 };
 
+const loadStoredAiPicks = (): PickPayload[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_AI_PICKS);
+    return raw ? (JSON.parse(raw) as PickPayload[]) : [];
+  } catch {
+    return [];
+  }
+};
+
 interface BracketState {
   userBracket: Bracket | null;
   aiBracket: Bracket | null;
@@ -29,6 +39,7 @@ interface BracketState {
   sessionId: string;
   aiSessionId: string | null;
   userPicks: PickPayload[];
+  aiPicks: PickPayload[];
   isLoadingBracket: boolean;
   isLoadingAI: boolean;
   error: string | null;
@@ -124,6 +135,7 @@ const initialState: BracketState = {
   sessionId: getOrCreateSessionId(),
   aiSessionId: null,
   userPicks: loadStoredPicks(),
+  aiPicks: loadStoredAiPicks(),
   isLoadingBracket: false,
   isLoadingAI: false,
   error: null,
@@ -138,19 +150,30 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
       const needsMigration = state.userPicks.length > 0 && state.userPicks.some((p) => !newMatchupIds.has(p.matchupId));
       const resolvedPicks = needsMigration ? migratePicks(state.userPicks, action.payload) : state.userPicks;
 
-      // Re-apply picks whenever bracket is freshly loaded or source changed
+      // Re-apply user picks whenever bracket is freshly loaded or source changed
       const shouldRestore = !state.userBracket || needsMigration;
       let restoredBracket: Bracket = { ...action.payload, id: state.sessionId, type: "user" };
       if (shouldRestore && resolvedPicks.length > 0) {
         restoredBracket = resolvedPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), restoredBracket);
       }
 
+      // Re-apply AI picks if any are stored
+      const needsAiMigration = state.aiPicks.length > 0 && state.aiPicks.some((p) => !newMatchupIds.has(p.matchupId));
+      const resolvedAiPicks = needsAiMigration ? migratePicks(state.aiPicks, action.payload) : state.aiPicks;
+      const shouldRestoreAi = !state.aiBracket || needsAiMigration;
+      let restoredAiBracket: Bracket | null = state.aiBracket;
+      if (shouldRestoreAi && resolvedAiPicks.length > 0) {
+        const base: Bracket = { ...action.payload, id: "ai-bracket", type: "ai" };
+        restoredAiBracket = resolvedAiPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), base);
+      }
+
       return {
         ...state,
         realBracket: action.payload,
         userBracket: shouldRestore ? restoredBracket : state.userBracket,
-        // Persist migrated pick IDs so future refreshes use the new matchup IDs
         userPicks: resolvedPicks,
+        aiBracket: restoredAiBracket,
+        aiPicks: resolvedAiPicks,
       };
     }
     case "SET_USER_BRACKET":
@@ -158,7 +181,7 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
     case "SET_AI_BRACKET":
       return { ...state, aiBracket: action.payload };
     case "RESET_AI_BRACKET":
-      return { ...state, aiBracket: null };
+      return { ...state, aiBracket: null, aiPicks: [] };
     case "ADD_AI_PICK": {
       // Initialize AI bracket from real bracket if not yet set
       const baseAI: Bracket =
@@ -166,7 +189,8 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
         (state.realBracket ? { ...state.realBracket, id: `ai-bracket`, type: "ai" as const } : null)!;
       if (!baseAI) return state;
       const updatedAI = applyPickToLocal(baseAI, action.payload);
-      return { ...state, aiBracket: updatedAI };
+      const updatedAiPicks = [...state.aiPicks.filter((p) => p.matchupId !== action.payload.matchupId), action.payload];
+      return { ...state, aiBracket: updatedAI, aiPicks: updatedAiPicks };
     }
     case "SET_LIVE_MATCHUPS":
       return { ...state, liveMatchups: action.payload };
@@ -199,10 +223,15 @@ const BracketContext = createContext<BracketContextValue | null>(null);
 export const BracketProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(bracketReducer, initialState);
 
-  // Sync picks to localStorage whenever they change so they survive a refresh
+  // Sync user picks to localStorage whenever they change so they survive a refresh
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_PICKS, JSON.stringify(state.userPicks));
   }, [state.userPicks]);
+
+  // Sync AI picks to localStorage
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_AI_PICKS, JSON.stringify(state.aiPicks));
+  }, [state.aiPicks]);
 
   const makePick = (matchupId: string, winner: Team) => {
     dispatch({ type: "ADD_PICK", payload: { matchupId, winnerId: winner.id } });
