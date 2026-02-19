@@ -65,13 +65,28 @@ const BracketPage = () => {
   }
 
   const totalPicks = state.userPicks.length;
+  const isLiveData = state.realBracket?.id === "bracket-live";
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-12">
       {/* Header */}
       <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black text-white">📝 My Bracket</h1>
+          <div className="flex items-center gap-3 mb-1">
+            <h1 className="text-2xl font-black text-white">📝 My Bracket</h1>
+            {state.realBracket &&
+              (isLiveData ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-900/50 border border-green-600/60 text-green-400 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Live ESPN Data
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-900/40 border border-yellow-600/50 text-yellow-400 text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                  2025 Fallback Data
+                </span>
+              ))}
+          </div>
           <p className="text-sm text-gray-400 mt-0.5">{totalPicks} / 63 picks made · Click a team to advance them</p>
         </div>
         <div className="flex items-center gap-3">
