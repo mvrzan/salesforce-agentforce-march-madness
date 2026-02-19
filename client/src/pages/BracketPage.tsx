@@ -10,6 +10,12 @@ const BracketPage = () => {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const handleReset = () => {
+    if (!window.confirm("Reset your bracket? All picks will be cleared.")) return;
+    dispatch({ type: "RESET_USER_BRACKET" });
+    setSaveMessage(null);
+  };
+
   useEffect(() => {
     if (state.realBracket) return;
 
@@ -119,6 +125,13 @@ const BracketPage = () => {
               {isRefreshing ? "Refreshing..." : "🔄 Refresh Live Data"}
             </button>
           )}
+          <button
+            onClick={handleReset}
+            disabled={totalPicks === 0}
+            className="px-4 py-2 bg-gray-700 hover:bg-red-900/60 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
+          >
+            Reset Bracket
+          </button>
           <button
             onClick={handleSave}
             disabled={isSaving || totalPicks === 0}

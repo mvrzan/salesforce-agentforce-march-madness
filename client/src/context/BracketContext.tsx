@@ -54,6 +54,7 @@ type BracketAction =
   | { type: "SET_LIVE_MATCHUPS"; payload: Matchup[] }
   | { type: "SET_AI_SESSION_ID"; payload: string }
   | { type: "ADD_PICK"; payload: PickPayload }
+  | { type: "RESET_USER_BRACKET" }
   | { type: "SET_LOADING_BRACKET"; payload: boolean }
   | { type: "SET_LOADING_AI"; payload: boolean }
   | { type: "SET_ERROR"; payload: string | null };
@@ -200,6 +201,13 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
       const updatedPicks = [...state.userPicks.filter((p) => p.matchupId !== action.payload.matchupId), action.payload];
       const updatedBracket = state.userBracket ? applyPickToLocal(state.userBracket, action.payload) : null;
       return { ...state, userPicks: updatedPicks, userBracket: updatedBracket };
+    }
+    case "RESET_USER_BRACKET": {
+      // Reset picks and rebuild a clean user bracket from the real bracket (no picks applied)
+      const cleanBracket: Bracket | null = state.realBracket
+        ? { ...state.realBracket, id: state.sessionId, type: "user" }
+        : null;
+      return { ...state, userPicks: [], userBracket: cleanBracket };
     }
     case "SET_LOADING_BRACKET":
       return { ...state, isLoadingBracket: action.payload };
