@@ -3,28 +3,28 @@ import { getBracketStructure, getLiveScores, getTeams } from "../controllers/res
 import { getCurrentTimestamp } from "../utils/loggingUtil.ts";
 import initSalesforceSdk from "../middleware/herokuServiceMesh.ts";
 
-const resultsRoutes = Router();
+const agentforceTools = Router();
 
 const initHerokuMiddleware = async () => {
   try {
     console.log(`${getCurrentTimestamp()} 🔧 - Initializing Agent Action routes...`);
     const { salesforceMiddleware, withSalesforceConfig } = await initSalesforceSdk();
 
-    resultsRoutes.get(
+    agentforceTools.get(
       "/api/v1/agentforce/results/teams",
       withSalesforceConfig({ parseRequest: true }),
       salesforceMiddleware,
       getTeams,
     );
 
-    resultsRoutes.get(
+    agentforceTools.get(
       "/api/v1/agentforce/results/bracket",
       withSalesforceConfig({ parseRequest: true }),
       salesforceMiddleware,
       getBracketStructure,
     );
 
-    resultsRoutes.get(
+    agentforceTools.get(
       "/api/v1/agentforce/results/live",
       withSalesforceConfig({ parseRequest: true }),
       salesforceMiddleware,
@@ -40,4 +40,4 @@ const initHerokuMiddleware = async () => {
 
 await initHerokuMiddleware();
 
-export default resultsRoutes;
+export default agentforceTools;
