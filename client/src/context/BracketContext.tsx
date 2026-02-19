@@ -45,6 +45,41 @@ type BracketAction =
   | { type: "SET_LOADING_AI"; payload: boolean }
   | { type: "SET_ERROR"; payload: string | null };
 
+/**
+ * When the bracket source changes (static fallback → live ESPN), stored matchup IDs
+ * no longer match. Re-map each pick to the new matchup that contains the same winner
+ * team as a participant. Picks whose team can't be found are dropped.
+ * Sorted by round order so propagation in applyPickToLocal works correctly.
+ */
+const migratePicks = (picks: PickPayload[], bracket: Bracket): PickPayload[] => {
+  const allMatchups = bracket.rounds.flatMap((r) => r.matchups);
+  const existingIds = new Set(allMatchups.map((m) => m.id));
+
+  // Build round lookup for sorting after migration
+  const matchupRound = new Map(bracket.rounds.flatMap((r) => r.matchups.map((m) => [m.id, r.round])));
+
+  const migrated = picks.flatMap((pick): PickPayload[] => {
+    // If the matchupId already exists in the new bracket, no migration needed
+    if (existingIds.has(pick.matchupId)) return [pick];
+
+    // Find a matchup where this team is a seeded participant (not a null placeholder)
+    const matchup = allMatchups.find(
+      (m) =>
+        (m.topTeam?.id === pick.winnerId || m.bottomTeam?.id === pick.winnerId) &&
+        (m.topTeam !== null || m.bottomTeam !== null),
+    );
+
+    return matchup ? [{ matchupId: matchup.id, winnerId: pick.winnerId }] : [];
+  });
+
+  // Sort by round order so propagation plays out correctly (R64 → R32 → ...)
+  return migrated.sort((a, b) => {
+    const rA = ROUND_ORDER.indexOf(matchupRound.get(a.matchupId) ?? "Round of 64");
+    const rB = ROUND_ORDER.indexOf(matchupRound.get(b.matchupId) ?? "Round of 64");
+    return rA - rB;
+  });
+};
+
 const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   const rounds = bracket.rounds.map((r) => ({
     ...r,
@@ -95,15 +130,25 @@ const initialState: BracketState = {
 const bracketReducer = (state: BracketState, action: BracketAction): BracketState => {
   switch (action.type) {
     case "SET_REAL_BRACKET": {
-      // If we have stored picks, re-apply them to the freshly loaded bracket structure
+      const newMatchupIds = new Set(action.payload.rounds.flatMap((r) => r.matchups.map((m) => m.id)));
+
+      // Detect bracket source change (e.g. static fallback → live ESPN data)
+      const needsMigration = state.userPicks.length > 0 && state.userPicks.some((p) => !newMatchupIds.has(p.matchupId));
+      const resolvedPicks = needsMigration ? migratePicks(state.userPicks, action.payload) : state.userPicks;
+
+      // Re-apply picks whenever bracket is freshly loaded or source changed
+      const shouldRestore = !state.userBracket || needsMigration;
       let restoredBracket: Bracket = { ...action.payload, id: state.sessionId, type: "user" };
-      if (!state.userBracket && state.userPicks.length > 0) {
-        restoredBracket = state.userPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), restoredBracket);
+      if (shouldRestore && resolvedPicks.length > 0) {
+        restoredBracket = resolvedPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), restoredBracket);
       }
+
       return {
         ...state,
         realBracket: action.payload,
-        userBracket: state.userBracket ?? restoredBracket,
+        userBracket: shouldRestore ? restoredBracket : state.userBracket,
+        // Persist migrated pick IDs so future refreshes use the new matchup IDs
+        userPicks: resolvedPicks,
       };
     }
     case "SET_USER_BRACKET":
