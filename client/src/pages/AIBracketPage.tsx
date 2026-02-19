@@ -45,7 +45,8 @@ const AIBracketPage = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const sequenceRef = useRef(1);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [hasGenerated, setHasGenerated] = useState(false);
+  // Restore hasGenerated from persisted AI picks so the bracket shows after a refresh
+  const [hasGenerated, setHasGenerated] = useState(() => state.aiPicks.length > 0);
   const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
 
   // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
@@ -74,6 +75,17 @@ const AIBracketPage = () => {
       setSessionStatus("error");
     },
   });
+
+  // Automatically clean up the Agentforce session when the user navigates away
+  useEffect(() => {
+    return () => {
+      if (sessionId) {
+        void deleteAgentSession(sessionId).catch(console.error);
+      }
+    };
+    // sessionId is captured via closure at unmount time
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load bracket structure if needed
   useEffect(() => {
@@ -121,18 +133,21 @@ const AIBracketPage = () => {
     }
   };
 
-  const handleEndSession = async () => {
-    if (!sessionId) return;
-    try {
-      await deleteAgentSession(sessionId);
-      setSessionId(null);
-      setSessionStatus("idle");
-      setHasGenerated(false);
-      reset();
-    } catch (err) {
-      console.error("Failed to end session:", err);
-    }
-  };
+  const sessionIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync so the unmount cleanup always sees the latest session ID
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  // Automatically clean up the Agentforce session when the user navigates away
+  useEffect(() => {
+    return () => {
+      if (sessionIdRef.current) {
+        void deleteAgentSession(sessionIdRef.current).catch(console.error);
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-12">
@@ -145,14 +160,6 @@ const AIBracketPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {sessionId && (
-            <button
-              onClick={handleEndSession}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold rounded-xl transition-colors"
-            >
-              End Session
-            </button>
-          )}
           <button
             onClick={handleGenerate}
             disabled={isGenerating || isStreaming}
