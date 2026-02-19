@@ -18,7 +18,7 @@ paths:
       x-sfdc:
         heroku:
           authorization:
-            connectedApp: "A2AConnectedApp"
+            connectedApp: "MarchMadnessConnectedApp"
       responses:
         "200":
           description: List of tournament teams
@@ -44,7 +44,7 @@ paths:
       x-sfdc:
         heroku:
           authorization:
-            connectedApp: "A2AConnectedApp"
+            connectedApp: "MarchMadnessConnectedApp"
       responses:
         "200":
           description: Full bracket structure
@@ -69,7 +69,7 @@ paths:
       x-sfdc:
         heroku:
           authorization:
-            connectedApp: "A2AConnectedApp"
+            connectedApp: "MarchMadnessConnectedApp"
       responses:
         "200":
           description: List of live and completed matchups
