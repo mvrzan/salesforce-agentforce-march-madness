@@ -8,6 +8,7 @@ const BracketPage = () => {
   const { state, dispatch, makePick } = useBracket();
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     if (state.realBracket) return;
@@ -26,6 +27,18 @@ const BracketPage = () => {
 
     void loadBracket();
   }, [dispatch, state.realBracket]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await getBracketStructure();
+      if (res.success) dispatch({ type: "SET_REAL_BRACKET", payload: res.data });
+    } catch (err) {
+      dispatch({ type: "SET_ERROR", payload: err instanceof Error ? err.message : "Failed to refresh bracket" });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handlePick = (matchupId: string, winner: Team) => {
     makePick(matchupId, winner);
@@ -97,6 +110,15 @@ const BracketPage = () => {
         </div>
         <div className="flex items-center gap-3">
           {saveMessage && <span className="text-sm text-gray-400">{saveMessage}</span>}
+          {isLiveData && (
+            <button
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
+            >
+              {isRefreshing ? "Refreshing..." : "🔄 Refresh Live Data"}
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={isSaving || totalPicks === 0}
