@@ -38,6 +38,8 @@ type BracketAction =
   | { type: "SET_REAL_BRACKET"; payload: Bracket }
   | { type: "SET_USER_BRACKET"; payload: Bracket }
   | { type: "SET_AI_BRACKET"; payload: Bracket }
+  | { type: "RESET_AI_BRACKET" }
+  | { type: "ADD_AI_PICK"; payload: PickPayload }
   | { type: "SET_LIVE_MATCHUPS"; payload: Matchup[] }
   | { type: "SET_AI_SESSION_ID"; payload: string }
   | { type: "ADD_PICK"; payload: PickPayload }
@@ -155,6 +157,17 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
       return { ...state, userBracket: action.payload };
     case "SET_AI_BRACKET":
       return { ...state, aiBracket: action.payload };
+    case "RESET_AI_BRACKET":
+      return { ...state, aiBracket: null };
+    case "ADD_AI_PICK": {
+      // Initialize AI bracket from real bracket if not yet set
+      const baseAI: Bracket =
+        state.aiBracket ??
+        (state.realBracket ? { ...state.realBracket, id: `ai-bracket`, type: "ai" as const } : null)!;
+      if (!baseAI) return state;
+      const updatedAI = applyPickToLocal(baseAI, action.payload);
+      return { ...state, aiBracket: updatedAI };
+    }
     case "SET_LIVE_MATCHUPS":
       return { ...state, liveMatchups: action.payload };
     case "SET_AI_SESSION_ID":
