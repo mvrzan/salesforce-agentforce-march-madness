@@ -2,47 +2,68 @@ import { useEffect, useState } from "react";
 import BracketTree from "../components/BracketTree";
 import ScoreSummaryBar from "../components/ScoreSummaryBar";
 import { useBracket } from "../context/BracketContext";
-import { getBracketStructure, scoreBracket } from "../services/api";
-import { type BracketScore } from "../types/tournament";
+import { getBracketStructure } from "../services/api";
+import { type Bracket, type BracketScore, type Round, ROUND_ORDER } from "../types/tournament";
+
+const POINTS_PER_ROUND: Record<Round, number> = {
+  "Round of 64": 1,
+  "Round of 32": 2,
+  "Sweet 16": 4,
+  "Elite 8": 8,
+  "Final Four": 16,
+  Championship: 32,
+};
+
+const scoreLocally = (picks: Bracket, real: Bracket): BracketScore => {
+  let total = 0;
+  const byRound = {} as Record<Round, number>;
+
+  for (const round of ROUND_ORDER) {
+    const pickRound = picks.rounds.find((r) => r.round === round);
+    const realRound = real.rounds.find((r) => r.round === round);
+    let pts = 0;
+    pickRound?.matchups.forEach((m) => {
+      const realMatchup = realRound?.matchups.find((rm) => rm.id === m.id);
+      if (realMatchup?.winner && m.winner?.id === realMatchup.winner.id) {
+        pts += POINTS_PER_ROUND[round];
+      }
+    });
+    byRound[round] = pts;
+    total += pts;
+  }
+
+  return { total, byRound, maxPossible: 192 };
+};
 
 const ComparePage = () => {
   const { state, dispatch } = useBracket();
   const [userScore, setUserScore] = useState<BracketScore | null>(null);
   const [aiScore, setAiScore] = useState<BracketScore | null>(null);
-  const [isScoring, setIsScoring] = useState(false);
 
   useEffect(() => {
     if (state.realBracket) return;
-    getBracketStructure()
-      .then((res) => {
+    const load = async () => {
+      try {
+        const res = await getBracketStructure();
         if (res.success) dispatch({ type: "SET_REAL_BRACKET", payload: res.data });
-      })
-      .catch(console.error);
-  }, []);
-
-  const handleScore = async () => {
-    setIsScoring(true);
-    try {
-      const [userRes, aiRes] = await Promise.allSettled([
-        state.userBracket ? scoreBracket(state.userBracket.id) : Promise.reject("No user bracket"),
-        state.aiBracket ? scoreBracket(state.aiBracket.id) : Promise.reject("No AI bracket"),
-      ]);
-
-      if (userRes.status === "fulfilled" && userRes.value.success) {
-        setUserScore(userRes.value.data);
+      } catch (err) {
+        console.error(err);
       }
-      if (aiRes.status === "fulfilled" && aiRes.value.success) {
-        setAiScore(aiRes.value.data);
-      }
-    } catch (err) {
-      console.error("Scoring error:", err);
-    } finally {
-      setIsScoring(false);
-    }
+    };
+    void load();
+  }, [dispatch, state.realBracket]);
+
+  const handleScore = () => {
+    if (!state.realBracket) return;
+    if (state.userBracket) setUserScore(scoreLocally(state.userBracket, state.realBracket));
+    if (state.aiBracket) setAiScore(scoreLocally(state.aiBracket, state.realBracket));
   };
 
   const hasUserBracket = !!state.userBracket;
   const hasAIBracket = !!state.aiBracket;
+
+  // Scoring only makes sense once real games have been played
+  const hasRealResults = state.realBracket?.rounds.some((r) => r.matchups.some((m) => m.winner != null)) ?? false;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white pb-12">
@@ -52,13 +73,16 @@ const ComparePage = () => {
           <h1 className="text-2xl font-black text-white">⚖️ Compare</h1>
           <p className="text-sm text-gray-400 mt-0.5">Your bracket vs Agentforce, measured against real results</p>
         </div>
-        <button
-          onClick={handleScore}
-          disabled={isScoring || (!hasUserBracket && !hasAIBracket)}
-          className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
-        >
-          {isScoring ? "Scoring..." : "Calculate Scores"}
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleScore}
+            disabled={!hasRealResults || (!hasUserBracket && !hasAIBracket)}
+            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+          >
+            Calculate Scores
+          </button>
+          {!hasRealResults && <p className="text-xs text-gray-500">Scores available once the tournament begins</p>}
+        </div>
       </div>
 
       {/* Score bar */}
