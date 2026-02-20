@@ -20,20 +20,20 @@ const NavBar = () => (
         </span>
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
         {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              `flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive ? "bg-orange-500 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`
             }
           >
-            <Icon size={15} className="hidden sm:block shrink-0" />
-            <span>{label}</span>
+            <Icon size={16} className="shrink-0" />
+            <span className="hidden sm:inline">{label}</span>
           </NavLink>
         ))}
       </div>
