@@ -61,8 +61,9 @@ const Footer = () => (
       {/* Bottom row: copyright + GitHub link */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
         <p className="text-gray-600 text-xs">
-          &copy; {new Date().getFullYear()} March Madness AI Demo. Built with{" "}
-          <span className="text-orange-400">Agentforce</span> &amp; <span className="text-blue-400">Data 360</span>.
+          &copy; {new Date().getFullYear()} March Madness AI Demo &mdash; Intelligent agents. Real-time data. Endless
+          possibilities &mdash; <span className="text-orange-400">Agentforce</span> &amp;{" "}
+          <span className="text-blue-400">Data 360</span>.
         </p>
 
         <a
