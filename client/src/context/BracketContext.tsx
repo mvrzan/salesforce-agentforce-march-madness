@@ -115,13 +115,33 @@ const clearWinners = (bracket: Bracket): Bracket => ({
   })),
 });
 
+const resolveWinner = (topTeam: Team | null, bottomTeam: Team | null, winnerId: string): Team | null => {
+  const id = winnerId.toUpperCase().trim();
+  const candidates = [topTeam, bottomTeam].filter((t): t is Team => t !== null);
+
+  // 1. Exact ID match
+  const exact = candidates.find((t) => t.id === winnerId);
+  if (exact) return exact;
+
+  // 2. Case-insensitive abbreviation match (e.g. "DUKE", "BAY")
+  const byAbbr = candidates.find((t) => t.abbreviation.toUpperCase() === id);
+  if (byAbbr) return byAbbr;
+
+  // 3. Case-insensitive name starts-with match (e.g. "Duke" matches "Duke Blue Devils")
+  const byName = candidates.find((t) => t.name.toUpperCase().startsWith(id) || id.startsWith(t.name.toUpperCase()));
+  if (byName) return byName;
+
+  // 4. Case-insensitive shortName match
+  const byShort = candidates.find((t) => t.shortName.toUpperCase() === id);
+  return byShort ?? null;
+};
+
 const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   const rounds = bracket.rounds.map((r) => ({
     ...r,
     matchups: r.matchups.map((m) => {
-      if (m.id !== pick.matchupId) return m;
-      const winner =
-        m.topTeam?.id === pick.winnerId ? m.topTeam : m.bottomTeam?.id === pick.winnerId ? m.bottomTeam : null;
+      if (m.id.toLowerCase() !== pick.matchupId.toLowerCase()) return m;
+      const winner = resolveWinner(m.topTeam, m.bottomTeam, pick.winnerId);
       return { ...m, winner };
     }),
   }));
@@ -131,7 +151,7 @@ const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   updated.rounds.forEach((round, ri) => {
     if (ri >= ROUND_ORDER.length - 1) return;
     round.matchups.forEach((matchup, mi) => {
-      if (matchup.id !== pick.matchupId || !matchup.winner) return;
+      if (matchup.id.toLowerCase() !== pick.matchupId.toLowerCase() || !matchup.winner) return;
       const nextRound = updated.rounds[ri + 1];
       if (!nextRound) return;
       const nextMatchupIdx = Math.floor(mi / 2);
@@ -215,7 +235,10 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
         (state.realBracket ? { ...clearWinners(state.realBracket), id: `ai-bracket`, type: "ai" as const } : null)!;
       if (!baseAI) return state;
       const updatedAI = applyPickToLocal(baseAI, action.payload);
-      const updatedAiPicks = [...state.aiPicks.filter((p) => p.matchupId !== action.payload.matchupId), action.payload];
+      const updatedAiPicks = [
+        ...state.aiPicks.filter((p) => p.matchupId.toLowerCase() !== action.payload.matchupId.toLowerCase()),
+        action.payload,
+      ];
       return { ...state, aiBracket: updatedAI, aiPicks: updatedAiPicks };
     }
     case "SET_LIVE_MATCHUPS":
