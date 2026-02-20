@@ -50,7 +50,9 @@ export const getBracketStructure = () =>
   apiFetch<{ success: boolean; data: import("../types/tournament").Bracket }>("/api/v1/results/bracket");
 
 export const getLiveScores = () =>
-  apiFetch<{ success: boolean; data: import("../types/tournament").Matchup[] }>("/api/v1/results/live");
+  apiFetch<{ success: boolean; data: import("../types/tournament").Matchup[]; isFallback: boolean }>(
+    "/api/v1/results/live",
+  );
 
 // ── User Bracket ──────────────────────────────────────────────────────────────
 export const saveBracket = (sessionId: string, picks: import("../types/tournament").PickPayload[]) =>
