@@ -93,9 +93,11 @@ const HomePage = () => (
           key={to}
           className={`rounded-2xl border bg-gray-900 p-6 flex flex-col gap-4 transition-all duration-200 ${colorMap[color]}`}
         >
-          <Icon className={iconColorMap[color]} size={32} />
+          <div className="flex items-center gap-3">
+            <Icon className={iconColorMap[color]} size={28} />
+            <h2 className="text-lg font-bold text-white">{title}</h2>
+          </div>
           <div>
-            <h2 className="text-lg font-bold text-white mb-1">{title}</h2>
             <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
           </div>
           <Link
