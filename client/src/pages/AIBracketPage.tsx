@@ -7,39 +7,23 @@ import { useBracket } from "../context/BracketContext";
 import { useSSE } from "../hooks/useSSE";
 import { startAgentSession, deleteAgentSession, sendStreamingMessage } from "../services/api";
 import { getBracketStructure } from "../services/api";
-import { type Bracket, type Region } from "../types/tournament";
 
-const REGIONS: Region[] = ["East", "West", "South", "Midwest"];
-const PICK_PATTERN = /PICK:\s*(\S+)\s*->\s*(\S+)/g;
+const PICK_PATTERN = /(?:PICK|UPSET\s+ALERT):\s*(\S+)\s*->\s*(\S+)/gi;
 
-const buildBracketPrompt = (bracket: Bracket): string => {
-  const r64 = bracket.rounds.find((r) => r.round === "Round of 64");
-  if (!r64) return "";
+// Sequential prompts — sent one at a time so the agent doesn't stall and ask for confirmation.
+// Each prompt is scoped to a single round so the response stays focused and parseable.
+// Format instructions belong in the Agentforce system prompt / topic config, not here.
+const ROUND_PROMPTS = [
+  `I need you to provide your picks for every Round of 64 matchup across all 4 regions.`,
 
-  const matchupLines = REGIONS.flatMap((region) => {
-    const matchups = r64.matchups.filter((m) => m.region === region);
-    return [
-      `\n${region} Region:`,
-      ...matchups.map(
-        (m) =>
-          `  MATCHUP_ID: ${m.id} | (${m.topTeam?.seed ?? "?"}) ${m.topTeam?.name ?? "TBD"} [TEAM_ID: ${m.topTeam?.id ?? "?"}] vs (${m.bottomTeam?.seed ?? "?"}) ${m.bottomTeam?.name ?? "TBD"} [TEAM_ID: ${m.bottomTeam?.id ?? "?"}]`,
-      ),
-    ];
-  });
+  `Now provide your picks for every Round of 32 matchup across all 4 regions, based on your Round of 64 picks.`,
 
-  return `You are analyzing the 2025 NCAA Men's Basketball Tournament bracket.
-Based on team seeds, historical performance, key players, coaching strength, and statistical matchups,
-predict the winner of every Round of 64 matchup.
+  `Now provide your picks for every Sweet 16 matchup across all 4 regions.`,
 
-Here is the bracket with the exact IDs you MUST use:
-${matchupLines.join("\n")}
+  `Now provide your picks for every Elite 8 matchup across all 4 regions.`,
 
-For EVERY matchup above, respond in this exact format:
-PICK: [MATCHUP_ID] -> [WINNER_TEAM_ID]
-REASON: [Brief 1-2 sentence explanation]
-
-Use ONLY the exact MATCHUP_ID and TEAM_ID values listed above. Cover all 32 matchups.`;
-};
+  `Finally, provide your picks for the Final Four (FF-1, FF-2) and Championship (CHAMP-1).`,
+];
 
 const AIBracketPage = () => {
   const { state, dispatch } = useBracket();
@@ -50,18 +34,23 @@ const AIBracketPage = () => {
   const [hasGenerated, setHasGenerated] = useState(() => state.aiPicks.length > 0);
   const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  // Accumulated reasoning content across all rounds — never resets mid-generation
+  const [allContent, setAllContent] = useState("");
 
   // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
   const aiTextRef = useRef("");
   const dispatchedPicksRef = useRef<Set<string>>(new Set());
 
-  const { content, isStreaming, error, stream, reset } = useSSE({
+  const { isStreaming, error, stream, reset } = useSSE({
     onChunk: (chunk) => {
       aiTextRef.current += chunk;
+      // Keep accumulated display content in sync (never wiped between rounds)
+      setAllContent((prev) => prev + chunk);
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
-        const matchupId = match[1];
-        const winnerId = match[2];
+        // Strip all markdown artifacts the agent may wrap around values (* ` [ ])
+        const matchupId = match[1].replace(/[*`[\]]/g, "").toLowerCase();
+        const winnerId = match[2].replace(/[*`[\]]/g, "");
         if (!dispatchedPicksRef.current.has(matchupId)) {
           dispatchedPicksRef.current.add(matchupId);
           dispatch({ type: "ADD_AI_PICK", payload: { matchupId, winnerId } });
@@ -69,8 +58,7 @@ const AIBracketPage = () => {
       }
     },
     onDone: () => {
-      setIsGenerating(false);
-      setHasGenerated(true);
+      // State is managed by handleGenerate after all rounds complete
     },
     onError: () => {
       setIsGenerating(false);
@@ -118,18 +106,24 @@ const AIBracketPage = () => {
     dispatch({ type: "RESET_AI_BRACKET" });
     aiTextRef.current = "";
     dispatchedPicksRef.current.clear();
+    setAllContent("");
     setIsGenerating(true);
     setHasGenerated(false);
 
     try {
       const agentSessionId = sessionId ?? (await initSession());
-      const seqId = sequenceRef.current++;
-      const prompt = state.realBracket ? buildBracketPrompt(state.realBracket) : "";
 
       // Auto-open the reasoning panel when generation starts
       setIsPanelOpen(true);
-      const fetchPromise = sendStreamingMessage(agentSessionId, prompt, seqId);
-      await stream(fetchPromise);
+
+      // Send one prompt per round sequentially so the agent never stalls
+      for (const prompt of ROUND_PROMPTS) {
+        const fetchPromise = sendStreamingMessage(agentSessionId, prompt, sequenceRef.current++);
+        await stream(fetchPromise);
+      }
+
+      setIsGenerating(false);
+      setHasGenerated(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start AI session";
       dispatch({ type: "SET_ERROR", payload: msg });
@@ -210,7 +204,7 @@ const AIBracketPage = () => {
       {/* Reasoning panel – fixed right overlay, never squeezes the bracket */}
       {isPanelOpen && (
         <div className="fixed right-0 top-14 bottom-0 w-96 z-40 flex flex-col shadow-2xl">
-          <ReasoningPanel content={content} isStreaming={isStreaming} error={error} title="Agentforce Reasoning" />
+          <ReasoningPanel content={allContent} isStreaming={isStreaming} error={error} title="Agentforce Reasoning" />
         </div>
       )}
     </div>
