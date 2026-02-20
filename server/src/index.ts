@@ -1,5 +1,4 @@
 import express from "express";
-import bodyParser from "body-parser";
 import cors from "cors";
 import { getCurrentTimestamp } from "./utils/loggingUtil.ts";
 import { errorHandler } from "./middleware/errorHandler.ts";
@@ -18,8 +17,8 @@ app.use(
   }),
 );
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use(agentforceApiRoutes);
