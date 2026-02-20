@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "dev": "node --env-file=./src/.env --watch src/index.ts",
-    "start": "node src/index.ts"
+    "start": "node --max-old-space-size=460 src/index.ts"
   },
   "keywords": [
     "agentforce",
@@ -20,7 +20,6 @@
   "type": "module",
   "dependencies": {
     "@heroku/applink": "^1.0.2",
-    "body-parser": "^2.2.2",
     "cors": "^2.8.6",
     "express": "^5.2.1"
   },
