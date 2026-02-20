@@ -301,17 +301,12 @@ const LivePage = () => {
                 ? "Use the 2025 tournament results to test Agentforce adaptation — select a completed round and ask the AI to update its picks based on what actually happened."
                 : "Tell Agentforce that a round has completed so it can adapt its remaining picks based on actual results."}
             </p>
-            <select
-              value={activeRound}
-              onChange={(e) => setActiveRound(e.target.value as Round)}
-              className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white mb-3 focus:outline-none focus:border-orange-500"
-            >
-              {ROUND_ORDER.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs text-gray-500">Selected round</span>
+              <span className="text-xs font-semibold text-orange-400 bg-orange-950/40 border border-orange-800/50 px-2 py-0.5 rounded-lg">
+                {activeRound}
+              </span>
+            </div>
             <button
               onClick={handleAdapt}
               disabled={isAdapting || isStreaming}
