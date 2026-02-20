@@ -118,6 +118,7 @@ const AIBracketPage = () => {
     aiTextRef.current = "";
     dispatchedPicksRef.current.clear();
     setIsGenerating(true);
+    setHasGenerated(false);
 
     try {
       const agentSessionId = sessionId ?? (await initSession());
@@ -183,13 +184,18 @@ const AIBracketPage = () => {
 
       {/* Bracket – full width */}
       <div className="max-w-screen-2xl mx-auto px-4">
-        <BracketTree
-          bracket={state.aiBracket ?? state.realBracket}
-          realBracket={state.realBracket}
-          isReadOnly
-          label="AI Picks"
-        />
-        {!hasGenerated && !isGenerating && (
+        {hasGenerated || isGenerating ? (
+          state.aiBracket ? (
+            <BracketTree bracket={state.aiBracket} realBracket={state.realBracket} isReadOnly label="AI Picks" />
+          ) : (
+            <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
+              <div className="text-center">
+                <div className="text-3xl mb-3 animate-bounce">🤖</div>
+                <div>Agentforce is analyzing the bracket...</div>
+              </div>
+            </div>
+          )
+        ) : (
           <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
             Click &quot;Generate AI Bracket&quot; to let Agentforce analyze the field
           </div>
