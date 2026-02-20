@@ -296,6 +296,62 @@ export const buildStaticBracket = (): Bracket => {
     }
   }
 
+  // Propagate winners into topTeam/bottomTeam of subsequent round matchups so
+  // every matchup beyond R64 shows actual participating teams (not null).
+  const byId = new Map(allMatchups.map((m) => [m.id, m]));
+
+  const setSlot = (matchupId: string, slot: "topTeam" | "bottomTeam", team: Team) => {
+    const m = byId.get(matchupId);
+    if (m) m[slot] = team;
+  };
+
+  // Regional rounds: R64 → R32 → S16 → E8
+  for (const region of regions) {
+    const r64Ids = SEED_PAIRS.map(([top, bottom]) => `${region}-R64-${top}v${bottom}`);
+    const r32Base = `${region}-Roundof32-`;
+    const s16Base = `${region}-Sweet16-`;
+    const e8Id = `${region}-Elite8-1`;
+
+    // R64 winners → R32 teams (pairs 0,1 → R32-1; 2,3 → R32-2; 4,5 → R32-3; 6,7 → R32-4)
+    for (let i = 0; i < r64Ids.length; i++) {
+      const winner = byId.get(r64Ids[i])?.winner;
+      if (!winner) continue;
+      const r32Id = `${r32Base}${Math.floor(i / 2) + 1}`;
+      setSlot(r32Id, i % 2 === 0 ? "topTeam" : "bottomTeam", winner);
+    }
+
+    // R32 winners → S16 teams (R32-1,2 → S16-1; R32-3,4 → S16-2)
+    for (let i = 1; i <= 4; i++) {
+      const winner = byId.get(`${r32Base}${i}`)?.winner;
+      if (!winner) continue;
+      const s16Id = `${s16Base}${Math.ceil(i / 2)}`;
+      setSlot(s16Id, i % 2 === 1 ? "topTeam" : "bottomTeam", winner);
+    }
+
+    // S16 winners → E8 teams
+    const s16_1Winner = byId.get(`${s16Base}1`)?.winner;
+    const s16_2Winner = byId.get(`${s16Base}2`)?.winner;
+    if (s16_1Winner) setSlot(e8Id, "topTeam", s16_1Winner);
+    if (s16_2Winner) setSlot(e8Id, "bottomTeam", s16_2Winner);
+  }
+
+  // E8 winners → Final Four
+  // NCAA bracket pairing: South vs West → FF-1, East vs Midwest → FF-2
+  const southE8 = byId.get("South-Elite8-1")?.winner;
+  const westE8 = byId.get("West-Elite8-1")?.winner;
+  const eastE8 = byId.get("East-Elite8-1")?.winner;
+  const midwestE8 = byId.get("Midwest-Elite8-1")?.winner;
+  if (southE8) setSlot("FF-1", "topTeam", southE8);
+  if (westE8) setSlot("FF-1", "bottomTeam", westE8);
+  if (eastE8) setSlot("FF-2", "topTeam", eastE8);
+  if (midwestE8) setSlot("FF-2", "bottomTeam", midwestE8);
+
+  // FF winners → Championship
+  const ff1Winner = byId.get("FF-1")?.winner;
+  const ff2Winner = byId.get("FF-2")?.winner;
+  if (ff1Winner) setSlot("CHAMP-1", "topTeam", ff1Winner);
+  if (ff2Winner) setSlot("CHAMP-1", "bottomTeam", ff2Winner);
+
   const rounds: BracketRound[] = ROUND_ORDER.map((round) => ({
     round,
     matchups: allMatchups.filter((m) => m.round === round),
