@@ -14,14 +14,16 @@ import { fetchBracketStructure } from "../services/espnService.ts";
 const bracketStore = new Map<string, Bracket>();
 
 const applyPicksToBracket = (base: Bracket, picks: PickPayload[]): Bracket => {
-  // Deep-clone the bracket rounds
+  // Deep-clone the bracket rounds, stripping any pre-baked winners and post-R64 teams
+  // so the resulting bracket only reflects the user's picks, not static 2025 results.
   const rounds: BracketRound[] = base.rounds.map((r) => ({
     round: r.round,
     matchups: r.matchups.map((m) => ({
       ...m,
-      topTeam: m.topTeam ? { ...m.topTeam } : null,
-      bottomTeam: m.bottomTeam ? { ...m.bottomTeam } : null,
-      winner: m.winner ? { ...m.winner } : null,
+      winner: null,
+      isComplete: false,
+      topTeam: r.round === "Round of 64" ? (m.topTeam ? { ...m.topTeam } : null) : null,
+      bottomTeam: r.round === "Round of 64" ? (m.bottomTeam ? { ...m.bottomTeam } : null) : null,
     })),
   }));
 
