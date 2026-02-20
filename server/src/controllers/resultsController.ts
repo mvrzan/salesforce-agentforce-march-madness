@@ -1,8 +1,11 @@
 import { type Request, type Response } from "express";
 import { getCurrentTimestamp } from "../utils/loggingUtil.ts";
 import { fetchBracketStructure, fetchLiveScores, fetchTeams } from "../services/espnService.ts";
+import { buildStaticBracket } from "../data/tournamentField2025.ts";
 import { type Bracket, type Matchup } from "../types/tournament.ts";
 import { type ESPNEvent } from "../types/api.ts";
+
+const NCAA_TOURNAMENT_ID = 22;
 
 export const getTeams = async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -80,8 +83,35 @@ export const getLiveScores = async (_req: Request, res: Response): Promise<void>
   try {
     console.log(`${getCurrentTimestamp()} 📡 - resultsController - Fetching live scores`);
     const events = await fetchLiveScores();
-    const matchups = events.map(mapESPNEventToMatchup);
-    res.status(200).json({ success: true, data: matchups });
+
+    // Only show NCAA tournament games (tournamentId 22), not regular season/conference games
+    const tournamentEvents = events.filter((e) => e.competitions[0]?.tournamentId === NCAA_TOURNAMENT_ID);
+
+    // Require at least 8 games to be considered an active tournament day (minimum for one R64 session).
+    // A single archived/stale game from a prior year should not prevent the fallback from triggering.
+    const ACTIVE_TOURNAMENT_THRESHOLD = 8;
+    if (tournamentEvents.length >= ACTIVE_TOURNAMENT_THRESHOLD) {
+      console.log(
+        `${getCurrentTimestamp()} ✅ - resultsController - Found ${tournamentEvents.length} live tournament games`,
+      );
+      const matchups = tournamentEvents.map(mapESPNEventToMatchup);
+      res.status(200).json({ success: true, data: matchups, isFallback: false });
+      return;
+    }
+
+    if (tournamentEvents.length > 0) {
+      console.log(
+        `${getCurrentTimestamp()} ⚠️ - resultsController - Found only ${tournamentEvents.length} tournament game(s) — likely stale archived data, using 2025 static bracket as fallback`,
+      );
+    }
+
+    // No live tournament games — fall back to static 2025 bracket results
+    console.log(
+      `${getCurrentTimestamp()} ⚠️ - resultsController - No live tournament games found, using 2025 static bracket as fallback`,
+    );
+    const staticBracket = buildStaticBracket();
+    const allMatchups = staticBracket.rounds.flatMap((r) => r.matchups).filter((m) => m.topTeam && m.bottomTeam);
+    res.status(200).json({ success: true, data: allMatchups, isFallback: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${getCurrentTimestamp()} ❌ - resultsController - getLiveScores error: ${message}`);
