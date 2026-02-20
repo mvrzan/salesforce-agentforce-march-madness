@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { CalendarClock, Radio, RefreshCw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useLivePolling } from "../hooks/useLivePolling";
 import { useSSE } from "../hooks/useSSE";
@@ -170,7 +171,9 @@ const LivePage = () => {
       {/* Header */}
       <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black text-white">📡 Live Tracking</h1>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            <Radio size={22} className="text-orange-400" /> Live Tracking
+          </h1>
           <p className="text-sm text-gray-400 mt-0.5">
             {liveGames.length > 0 ? `${liveGames.length} games in progress` : "Polling every 30s for updates"}
           </p>
@@ -178,9 +181,10 @@ const LivePage = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={refresh}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm font-semibold text-white rounded-xl transition-colors"
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-sm font-semibold text-white rounded-xl transition-colors flex items-center gap-2"
           >
-            🔄 Refresh
+            <RefreshCw size={14} />
+            Refresh
           </button>
         </div>
       </div>
@@ -219,7 +223,7 @@ const LivePage = () => {
       {isFallback && (
         <div className="max-w-screen-2xl mx-auto px-4 mb-4">
           <div className="flex items-start gap-3 bg-amber-950/40 border border-amber-700/50 rounded-xl px-4 py-3">
-            <span className="text-amber-400 text-lg mt-0.5">🗓️</span>
+            <CalendarClock size={18} className="text-amber-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-sm font-semibold text-amber-300">Tournament not active</p>
               <p className="text-xs text-amber-500 mt-0.5">

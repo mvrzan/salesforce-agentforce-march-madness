@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, Bot, ClipboardList, Scale } from "lucide-react";
 import BracketTree from "../components/BracketTree";
 import ScoreSummaryBar from "../components/ScoreSummaryBar";
 import { useBracket } from "../context/BracketContext";
@@ -70,7 +71,9 @@ const ComparePage = () => {
       {/* Header */}
       <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black text-white">⚖️ Compare</h1>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            <Scale size={22} className="text-orange-400" /> Compare
+          </h1>
           <p className="text-sm text-gray-400 mt-0.5">Your bracket vs Agentforce, measured against real results</p>
         </div>
         <button
@@ -94,7 +97,7 @@ const ComparePage = () => {
         <div className="max-w-screen-2xl mx-auto px-4 mb-4 flex gap-3 flex-wrap">
           {!hasUserBracket && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-900/30 border border-blue-700 text-sm text-blue-300">
-              ⚠️ No user bracket yet —{" "}
+              <AlertTriangle size={14} className="shrink-0" /> No user bracket yet —{" "}
               <a href="/bracket" className="underline hover:text-blue-200">
                 build yours
               </a>
@@ -102,7 +105,7 @@ const ComparePage = () => {
           )}
           {!hasAIBracket && (
             <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-900/30 border border-orange-700 text-sm text-orange-300">
-              ⚠️ No AI bracket yet —{" "}
+              <AlertTriangle size={14} className="shrink-0" /> No AI bracket yet —{" "}
               <a href="/ai-bracket" className="underline hover:text-orange-200">
                 generate one
               </a>
@@ -116,13 +119,14 @@ const ComparePage = () => {
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab("user")}
-            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border ${
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border flex items-center gap-2 ${
               activeTab === "user"
                 ? "bg-blue-600 border-blue-500 text-white"
                 : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
             }`}
           >
-            📝 Your Bracket
+            <ClipboardList size={15} />
+            Your Bracket
             {userScore && (
               <span
                 className={`ml-2 text-xs font-semibold ${activeTab === "user" ? "text-blue-200" : "text-gray-500"}`}
@@ -133,13 +137,14 @@ const ComparePage = () => {
           </button>
           <button
             onClick={() => setActiveTab("ai")}
-            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border ${
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border flex items-center gap-2 ${
               activeTab === "ai"
                 ? "bg-orange-600 border-orange-500 text-white"
                 : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
             }`}
           >
-            🤖 AI Bracket
+            <Bot size={15} />
+            AI Bracket
             {aiScore && (
               <span
                 className={`ml-2 text-xs font-semibold ${activeTab === "ai" ? "text-orange-200" : "text-gray-500"}`}

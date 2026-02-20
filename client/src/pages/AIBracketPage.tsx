@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Bot, RefreshCw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import BracketTree from "../components/BracketTree";
 import ReasoningPanel from "../components/ReasoningPanel";
@@ -158,7 +159,9 @@ const AIBracketPage = () => {
       {/* Header */}
       <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black text-white">🤖 AI Bracket</h1>
+          <h1 className="text-2xl font-black text-white flex items-center gap-2">
+            <Bot size={22} className="text-orange-400" /> AI Bracket
+          </h1>
           <p className="text-sm text-gray-400 mt-0.5">
             Powered by Salesforce Agentforce · {sessionStatus === "active" ? "Session active" : "No session"}
           </p>
@@ -167,16 +170,18 @@ const AIBracketPage = () => {
           {(hasGenerated || isStreaming) && (
             <button
               onClick={() => setIsPanelOpen((o) => !o)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
             >
-              {isPanelOpen ? "Hide Reasoning" : "🤖 Show Reasoning"}
+              <Bot size={14} />
+              {isPanelOpen ? "Hide Reasoning" : "Show Reasoning"}
             </button>
           )}
           <button
             onClick={handleGenerate}
             disabled={isGenerating || isStreaming}
-            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm flex items-center gap-2"
           >
+            {(isGenerating || isStreaming) && <RefreshCw size={14} className="animate-spin" />}
             {isGenerating || isStreaming ? "Generating..." : hasGenerated ? "Regenerate" : "Generate AI Bracket"}
           </button>
         </div>
@@ -190,7 +195,7 @@ const AIBracketPage = () => {
           ) : (
             <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
               <div className="text-center">
-                <div className="text-3xl mb-3 animate-bounce">🤖</div>
+                <Bot size={36} className="mx-auto mb-3 text-orange-400 animate-bounce" />
                 <div>Agentforce is analyzing the bracket...</div>
               </div>
             </div>

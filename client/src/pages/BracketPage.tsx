@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ClipboardList, Loader2, RefreshCw, XCircle } from "lucide-react";
 import BracketTree from "../components/BracketTree";
 import { useBracket } from "../context/BracketContext";
 import { getBracketStructure, saveBracket } from "../services/api";
@@ -70,7 +71,7 @@ const BracketPage = () => {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400">
         <div className="text-center">
-          <div className="text-3xl mb-3 animate-bounce">🏀</div>
+          <Loader2 size={36} className="mx-auto mb-3 text-orange-400 animate-spin" />
           <div>Loading bracket...</div>
         </div>
       </div>
@@ -81,7 +82,7 @@ const BracketPage = () => {
     return (
       <div className="flex items-center justify-center h-64 text-red-400">
         <div className="text-center">
-          <div className="text-3xl mb-3">❌</div>
+          <XCircle size={36} className="mx-auto mb-3 text-red-400" />
           <div>{state.error}</div>
         </div>
       </div>
@@ -97,7 +98,9 @@ const BracketPage = () => {
       <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-black text-white">📝 My Bracket</h1>
+            <h1 className="text-2xl font-black text-white flex items-center gap-2">
+              <ClipboardList size={22} className="text-orange-400" /> My Bracket
+            </h1>
             {state.realBracket &&
               (isLiveData ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-900/50 border border-green-600/60 text-green-400 text-xs font-semibold">
@@ -119,9 +122,10 @@ const BracketPage = () => {
             <button
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
             >
-              {isRefreshing ? "Refreshing..." : "🔄 Refresh Live Data"}
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+              {isRefreshing ? "Refreshing..." : "Refresh Live Data"}
             </button>
           )}
           <button
