@@ -36,6 +36,7 @@ interface BracketState {
   aiBracket: Bracket | null;
   realBracket: Bracket | null;
   liveMatchups: Matchup[];
+  isLiveFallback: boolean;
   sessionId: string;
   aiSessionId: string | null;
   userPicks: PickPayload[];
@@ -51,7 +52,7 @@ type BracketAction =
   | { type: "SET_AI_BRACKET"; payload: Bracket }
   | { type: "RESET_AI_BRACKET" }
   | { type: "ADD_AI_PICK"; payload: PickPayload }
-  | { type: "SET_LIVE_MATCHUPS"; payload: Matchup[] }
+  | { type: "SET_LIVE_MATCHUPS"; payload: { matchups: Matchup[]; isFallback: boolean } }
   | { type: "SET_AI_SESSION_ID"; payload: string }
   | { type: "ADD_PICK"; payload: PickPayload }
   | { type: "RESET_USER_BRACKET" }
@@ -94,6 +95,26 @@ const migratePicks = (picks: PickPayload[], bracket: Bracket): PickPayload[] => 
   });
 };
 
+/**
+ * Returns a copy of a bracket with all winners cleared, and all post-R64 team
+ * slots nulled out. Used as the base when building user/AI brackets so that
+ * preset 2025 results and propagated teams don't bleed into pick-derived brackets.
+ * The realBracket itself is left untouched for scoring purposes.
+ */
+const clearWinners = (bracket: Bracket): Bracket => ({
+  ...bracket,
+  rounds: bracket.rounds.map((r) => ({
+    ...r,
+    matchups: r.matchups.map((m) => ({
+      ...m,
+      winner: null,
+      isComplete: false,
+      // Beyond R64, teams only appear via picks — clear pre-propagated slots
+      ...(r.round !== "Round of 64" ? { topTeam: null, bottomTeam: null } : {}),
+    })),
+  })),
+});
+
 const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   const rounds = bracket.rounds.map((r) => ({
     ...r,
@@ -133,6 +154,7 @@ const initialState: BracketState = {
   aiBracket: null,
   realBracket: null,
   liveMatchups: [],
+  isLiveFallback: false,
   sessionId: getOrCreateSessionId(),
   aiSessionId: null,
   userPicks: loadStoredPicks(),
@@ -147,24 +169,27 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
     case "SET_REAL_BRACKET": {
       const newMatchupIds = new Set(action.payload.rounds.flatMap((r) => r.matchups.map((m) => m.id)));
 
+      // Strip preset winners so user/AI brackets only reflect picks, not baked-in 2025 results
+      const cleanPayload = clearWinners(action.payload);
+
       // Detect bracket source change (e.g. static fallback → live ESPN data)
       const needsMigration = state.userPicks.length > 0 && state.userPicks.some((p) => !newMatchupIds.has(p.matchupId));
-      const resolvedPicks = needsMigration ? migratePicks(state.userPicks, action.payload) : state.userPicks;
+      const resolvedPicks = needsMigration ? migratePicks(state.userPicks, cleanPayload) : state.userPicks;
 
       // Re-apply user picks whenever bracket is freshly loaded or source changed
       const shouldRestore = !state.userBracket || needsMigration;
-      let restoredBracket: Bracket = { ...action.payload, id: state.sessionId, type: "user" };
+      let restoredBracket: Bracket = { ...cleanPayload, id: state.sessionId, type: "user" };
       if (shouldRestore && resolvedPicks.length > 0) {
         restoredBracket = resolvedPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), restoredBracket);
       }
 
       // Re-apply AI picks if any are stored
       const needsAiMigration = state.aiPicks.length > 0 && state.aiPicks.some((p) => !newMatchupIds.has(p.matchupId));
-      const resolvedAiPicks = needsAiMigration ? migratePicks(state.aiPicks, action.payload) : state.aiPicks;
+      const resolvedAiPicks = needsAiMigration ? migratePicks(state.aiPicks, cleanPayload) : state.aiPicks;
       const shouldRestoreAi = !state.aiBracket || needsAiMigration;
       let restoredAiBracket: Bracket | null = state.aiBracket;
       if (shouldRestoreAi && resolvedAiPicks.length > 0) {
-        const base: Bracket = { ...action.payload, id: "ai-bracket", type: "ai" };
+        const base: Bracket = { ...cleanPayload, id: "ai-bracket", type: "ai" };
         restoredAiBracket = resolvedAiPicks.reduce((bracket, pick) => applyPickToLocal(bracket, pick), base);
       }
 
@@ -184,17 +209,17 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
     case "RESET_AI_BRACKET":
       return { ...state, aiBracket: null, aiPicks: [] };
     case "ADD_AI_PICK": {
-      // Initialize AI bracket from real bracket if not yet set
+      // Initialize AI bracket from real bracket if not yet set (stripped of preset winners)
       const baseAI: Bracket =
         state.aiBracket ??
-        (state.realBracket ? { ...state.realBracket, id: `ai-bracket`, type: "ai" as const } : null)!;
+        (state.realBracket ? { ...clearWinners(state.realBracket), id: `ai-bracket`, type: "ai" as const } : null)!;
       if (!baseAI) return state;
       const updatedAI = applyPickToLocal(baseAI, action.payload);
       const updatedAiPicks = [...state.aiPicks.filter((p) => p.matchupId !== action.payload.matchupId), action.payload];
       return { ...state, aiBracket: updatedAI, aiPicks: updatedAiPicks };
     }
     case "SET_LIVE_MATCHUPS":
-      return { ...state, liveMatchups: action.payload };
+      return { ...state, liveMatchups: action.payload.matchups, isLiveFallback: action.payload.isFallback };
     case "SET_AI_SESSION_ID":
       return { ...state, aiSessionId: action.payload };
     case "ADD_PICK": {
@@ -203,9 +228,9 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
       return { ...state, userPicks: updatedPicks, userBracket: updatedBracket };
     }
     case "RESET_USER_BRACKET": {
-      // Reset picks and rebuild a clean user bracket from the real bracket (no picks applied)
+      // Reset picks and rebuild a clean user bracket from the real bracket (no picks, no preset winners)
       const cleanBracket: Bracket | null = state.realBracket
-        ? { ...state.realBracket, id: state.sessionId, type: "user" }
+        ? { ...clearWinners(state.realBracket), id: state.sessionId, type: "user" }
         : null;
       return { ...state, userPicks: [], userBracket: cleanBracket };
     }
