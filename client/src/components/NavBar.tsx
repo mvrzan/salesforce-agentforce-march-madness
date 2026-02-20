@@ -1,11 +1,13 @@
 import { NavLink } from "react-router-dom";
+import { Bot, ClipboardList, Home, Radio, Scale } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 
-const NAV_ITEMS = [
-  { to: "/", label: "Home", icon: "🏠", end: true },
-  { to: "/bracket", label: "My Bracket", icon: "📝", end: false },
-  { to: "/ai-bracket", label: "AI Bracket", icon: "🤖", end: false },
-  { to: "/compare", label: "Compare", icon: "⚖️", end: false },
-  { to: "/live", label: "Live", icon: "📡", end: false },
+const NAV_ITEMS: { to: string; label: string; icon: LucideIcon; end: boolean }[] = [
+  { to: "/", label: "Home", icon: Home, end: true },
+  { to: "/bracket", label: "My Bracket", icon: ClipboardList, end: false },
+  { to: "/ai-bracket", label: "AI Bracket", icon: Bot, end: false },
+  { to: "/compare", label: "Compare", icon: Scale, end: false },
+  { to: "/live", label: "Live", icon: Radio, end: false },
 ];
 
 const NavBar = () => (
@@ -19,7 +21,7 @@ const NavBar = () => (
       </div>
 
       <div className="flex items-center gap-1">
-        {NAV_ITEMS.map(({ to, label, icon, end }) => (
+        {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}
@@ -30,7 +32,7 @@ const NavBar = () => (
               }`
             }
           >
-            <span className="hidden sm:inline">{icon}</span>
+            <Icon size={15} className="hidden sm:block shrink-0" />
             <span>{label}</span>
           </NavLink>
         ))}
