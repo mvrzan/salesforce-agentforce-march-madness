@@ -57,7 +57,6 @@ const BracketPage = () => {
     try {
       const res = await saveBracket(state.sessionId, state.userPicks);
       if (res.success) {
-        dispatch({ type: "SET_USER_BRACKET", payload: res.data });
         setSaveMessage("✅ Bracket saved!");
       }
     } catch (err) {
