@@ -35,10 +35,13 @@ const scoreLocally = (picks: Bracket, real: Bracket): BracketScore => {
   return { total, byRound, maxPossible: 192 };
 };
 
+type ActiveTab = "user" | "ai";
+
 const ComparePage = () => {
   const { state, dispatch } = useBracket();
   const [userScore, setUserScore] = useState<BracketScore | null>(null);
   const [aiScore, setAiScore] = useState<BracketScore | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("user");
 
   useEffect(() => {
     if (state.realBracket) return;
@@ -108,15 +111,57 @@ const ComparePage = () => {
         </div>
       )}
 
-      {/* Side-by-side brackets */}
-      <div className="max-w-screen-2xl mx-auto px-4 flex gap-6 flex-wrap xl:flex-nowrap">
-        <div className="flex-1 min-w-0 overflow-auto bg-gray-900/40 rounded-2xl border border-blue-800/40 p-4">
-          <BracketTree bracket={state.userBracket} realBracket={state.realBracket} isReadOnly label="Your Bracket" />
+      {/* Tab switcher */}
+      <div className="max-w-screen-2xl mx-auto px-4 mb-4">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("user")}
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border ${
+              activeTab === "user"
+                ? "bg-blue-600 border-blue-500 text-white"
+                : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
+            }`}
+          >
+            📝 Your Bracket
+            {userScore && (
+              <span
+                className={`ml-2 text-xs font-semibold ${activeTab === "user" ? "text-blue-200" : "text-gray-500"}`}
+              >
+                {userScore.total} pts
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("ai")}
+            className={`px-5 py-2 rounded-xl text-sm font-bold transition-colors border ${
+              activeTab === "ai"
+                ? "bg-orange-600 border-orange-500 text-white"
+                : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white hover:border-gray-600"
+            }`}
+          >
+            🤖 AI Bracket
+            {aiScore && (
+              <span
+                className={`ml-2 text-xs font-semibold ${activeTab === "ai" ? "text-orange-200" : "text-gray-500"}`}
+              >
+                {aiScore.total} pts
+              </span>
+            )}
+          </button>
         </div>
+      </div>
 
-        <div className="flex-1 min-w-0 overflow-auto bg-gray-900/40 rounded-2xl border border-orange-800/40 p-4">
-          <BracketTree bracket={state.aiBracket} realBracket={state.realBracket} isReadOnly label="AI Bracket" />
-        </div>
+      {/* Single bracket view */}
+      <div className="max-w-screen-2xl mx-auto px-4">
+        {activeTab === "user" ? (
+          <div className="overflow-x-auto bg-gray-900/40 rounded-2xl border border-blue-800/40 p-4">
+            <BracketTree bracket={state.userBracket} realBracket={state.realBracket} isReadOnly label="Your Bracket" />
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-gray-900/40 rounded-2xl border border-orange-800/40 p-4">
+            <BracketTree bracket={state.aiBracket} realBracket={state.realBracket} isReadOnly label="AI Bracket" />
+          </div>
+        )}
       </div>
     </div>
   );
