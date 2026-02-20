@@ -11,7 +11,7 @@ import LivePage from "./pages/LivePage";
 const App = () => (
   <BracketProvider>
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-950 flex flex-col">
+      <div className="min-h-screen bg-gray-950 flex flex-col overflow-x-hidden">
         <NavBar />
         <main className="flex-1">
           <Routes>
