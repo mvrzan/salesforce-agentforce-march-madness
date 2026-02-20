@@ -105,7 +105,7 @@ const LiveMatchupCard = ({ matchup }: { matchup: Matchup }) => {
   );
 };
 
-const PICK_PATTERN = /PICK:\s*(\S+)\s*->\s*(\S+)/g;
+const PICK_PATTERN = /(?:PICK|UPSET\s+ALERT):\s*(\S+)\s*->\s*(\S+)/gi;
 
 const LivePage = () => {
   const { state, dispatch } = useBracket();
@@ -123,8 +123,9 @@ const LivePage = () => {
       aiTextRef.current += chunk;
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
-        const matchupId = match[1];
-        const winnerId = match[2];
+        // Strip all markdown artifacts the agent may wrap around values (* ` [ ])
+        const matchupId = match[1].replace(/[*`[\]]/g, "").toLowerCase();
+        const winnerId = match[2].replace(/[*`[\]]/g, "");
         if (!dispatchedPicksRef.current.has(matchupId)) {
           dispatchedPicksRef.current.add(matchupId);
           dispatch({ type: "ADD_AI_PICK", payload: { matchupId, winnerId } });
