@@ -17,6 +17,33 @@ const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens
 // NCAA Men's Basketball Championship tournament ID on ESPN
 const NCAA_TOURNAMENT_ID = 22;
 
+// ── In-process TTL cache ──────────────────────────────────────────────────────
+// Prevents redundant fan-out ESPN fetches on every request and keeps memory usage
+// bounded on low-RAM dynos (Heroku eco = 512 MB).
+
+interface CacheEntry<T> {
+  value: T;
+  expiresAt: number;
+}
+
+const cache = new Map<string, CacheEntry<unknown>>();
+
+const getCached = <T>(key: string): T | null => {
+  const entry = cache.get(key) as CacheEntry<T> | undefined;
+  if (!entry || Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+};
+
+const setCached = <T>(key: string, value: T, ttlMs: number): void => {
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+};
+
+const BRACKET_CACHE_TTL = 5 * 60 * 1000; // 5 minutes — bracket data changes slowly
+const LIVE_SCORES_CACHE_TTL = 30 * 1000; // 30 seconds — live scores need to be fresh
+
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
 /**
@@ -266,6 +293,12 @@ const fetchScoreboardForDate = async (date: string): Promise<ESPNEvent[]> => {
  *  - Fewer than 32 Round-of-64 games are returned (incomplete data)
  */
 export const fetchBracketStructure = async (): Promise<Bracket> => {
+  const cached = getCached<Bracket>("bracket");
+  if (cached) {
+    console.log(`${getCurrentTimestamp()} 📋 - espnService - Returning cached bracket`);
+    return cached;
+  }
+
   const year = new Date().getFullYear();
   console.log(`${getCurrentTimestamp()} 🏀 - espnService - Fetching live bracket for ${year} tournament`);
 
@@ -293,16 +326,26 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
 
   if (r64Count >= 32) {
     console.log(`${getCurrentTimestamp()} ✅ - espnService - Found ${r64Count} R64 games, building live bracket`);
-    return buildBracketFromESPNGames(uniqueEvents);
+    const bracket = buildBracketFromESPNGames(uniqueEvents);
+    setCached("bracket", bracket, BRACKET_CACHE_TTL);
+    return bracket;
   }
 
   console.log(
     `${getCurrentTimestamp()} ⚠️ - espnService - Only ${r64Count} R64 games found (tournament not yet announced). Using 2024 static bracket as fallback.`,
   );
-  return buildStaticBracket();
+  const staticBracket = buildStaticBracket();
+  setCached("bracket", staticBracket, BRACKET_CACHE_TTL);
+  return staticBracket;
 };
 
 export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
+  const cached = getCached<ESPNEvent[]>("liveScores");
+  if (cached) {
+    console.log(`${getCurrentTimestamp()} 📋 - espnService - Returning cached live scores`);
+    return cached;
+  }
+
   console.log(`${getCurrentTimestamp()} 📡 - espnService - Fetching live scores`);
 
   try {
@@ -313,7 +356,9 @@ export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
     }
 
     const data = (await response.json()) as ESPNScoreboard;
-    return data.events ?? [];
+    const events = data.events ?? [];
+    setCached("liveScores", events, LIVE_SCORES_CACHE_TTL);
+    return events;
   } catch (err) {
     if (err instanceof AppError) throw err;
     console.error(`${getCurrentTimestamp()} ❌ - espnService - Failed to fetch live scores`, err);
