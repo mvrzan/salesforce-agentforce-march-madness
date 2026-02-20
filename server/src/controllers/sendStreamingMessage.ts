@@ -7,6 +7,10 @@ const sendStreamingMessage = async (req: Request, res: Response) => {
     console.log(`${getCurrentTimestamp()} 🎥 - sendStreamingMessage - Request received...`);
 
     const connectionName = process.env.APP_LINK_CONNECTION_NAME;
+    if (!connectionName) {
+      throw new Error("APP_LINK_CONNECTION_NAME environment variable is not set");
+    }
+
     const sdk = salesforceSdk.init();
     const auth = await sdk.addons.applink.getAuthorization(connectionName);
     const accessToken = auth.accessToken;
