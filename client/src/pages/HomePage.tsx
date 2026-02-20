@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
+import { Bot, ClipboardList, Radio, Scale, Trophy } from "lucide-react";
+import { type LucideIcon } from "lucide-react";
 
-const FEATURES = [
+const FEATURES: { icon: LucideIcon; title: string; description: string; to: string; cta: string; color: string }[] = [
   {
-    icon: "📝",
+    icon: ClipboardList,
     title: "Build Your Bracket",
     description: "Select winners through all 6 rounds across 4 regions. Your picks are saved automatically.",
     to: "/bracket",
@@ -10,7 +12,7 @@ const FEATURES = [
     color: "blue",
   },
   {
-    icon: "🤖",
+    icon: Bot,
     title: "AI-Powered Bracket",
     description: "Watch Agentforce analyze matchups in real time and generate picks with full reasoning.",
     to: "/ai-bracket",
@@ -18,7 +20,7 @@ const FEATURES = [
     color: "orange",
   },
   {
-    icon: "⚖️",
+    icon: Scale,
     title: "Head-to-Head Compare",
     description: "Your bracket vs the AI side-by-side. See who called the upsets and who got burned.",
     to: "/compare",
@@ -26,7 +28,7 @@ const FEATURES = [
     color: "purple",
   },
   {
-    icon: "📡",
+    icon: Radio,
     title: "Live Performance",
     description: "Track scores in real time as games finish. Watch the AI adapt its predictions round by round.",
     to: "/live",
@@ -49,11 +51,18 @@ const ctaColorMap: Record<string, string> = {
   green: "bg-green-600 hover:bg-green-500",
 };
 
+const iconColorMap: Record<string, string> = {
+  blue: "text-blue-400",
+  orange: "text-orange-400",
+  purple: "text-purple-400",
+  green: "text-green-400",
+};
+
 const HomePage = () => (
   <div className="min-h-screen bg-gray-950 text-white">
     {/* Hero */}
     <div className="max-w-4xl mx-auto px-4 pt-20 pb-16 text-center">
-      <div className="text-6xl mb-4">🏀</div>
+      <Trophy size={64} className="mx-auto text-orange-400 mb-4" />
       <h1 className="text-4xl sm:text-6xl font-black tracking-tight mb-4">
         March Madness <span className="text-orange-400">× Agentforce</span>
       </h1>
@@ -79,12 +88,12 @@ const HomePage = () => (
 
     {/* Feature grid */}
     <div className="max-w-5xl mx-auto px-4 pb-20 grid grid-cols-1 sm:grid-cols-2 gap-5">
-      {FEATURES.map(({ icon, title, description, to, cta, color }) => (
+      {FEATURES.map(({ icon: Icon, title, description, to, cta, color }) => (
         <div
           key={to}
           className={`rounded-2xl border bg-gray-900 p-6 flex flex-col gap-4 transition-all duration-200 ${colorMap[color]}`}
         >
-          <div className="text-3xl">{icon}</div>
+          <Icon className={iconColorMap[color]} size={32} />
           <div>
             <h2 className="text-lg font-bold text-white mb-1">{title}</h2>
             <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
