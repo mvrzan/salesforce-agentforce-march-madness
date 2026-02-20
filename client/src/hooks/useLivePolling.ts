@@ -12,7 +12,7 @@ export const useLivePolling = (enabled = true) => {
     try {
       const res = await getLiveScores();
       if (res.success) {
-        dispatch({ type: "SET_LIVE_MATCHUPS", payload: res.data });
+        dispatch({ type: "SET_LIVE_MATCHUPS", payload: { matchups: res.data, isFallback: res.isFallback ?? false } });
       }
     } catch (err) {
       console.error("Live polling error:", err);
