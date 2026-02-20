@@ -98,11 +98,6 @@ const HomePage = () => (
         </div>
       ))}
     </div>
-
-    {/* Powered by */}
-    <div className="text-center pb-12 text-sm text-gray-600">
-      Powered by <span className="text-gray-500">Salesforce Agentforce</span> · ESPN Data · Heroku AppLink
-    </div>
   </div>
 );
 
