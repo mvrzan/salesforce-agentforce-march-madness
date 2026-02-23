@@ -24,6 +24,10 @@ export const getBracketStructure = async (req: Request, res: Response): Promise<
     console.log(`${getCurrentTimestamp()} 🏀 - resultsController - Fetching bracket structure`);
     console.log("=== Incoming Request Headers ===");
     console.log("x-addon-sso:", req.headers["x-addon-sso"]);
+    console.log("headers:", req.headers);
+    Object.entries(req.headers).forEach(([key, value]) => {
+      console.log(`${key}: ${value}`);
+    });
     const bracket = await fetchBracketStructure();
     res.status(200).json({ success: true, data: bracket });
   } catch (error) {
