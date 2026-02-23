@@ -19,9 +19,11 @@ export const getTeams = async (_req: Request, res: Response): Promise<void> => {
   }
 };
 
-export const getBracketStructure = async (_req: Request, res: Response): Promise<void> => {
+export const getBracketStructure = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log(`${getCurrentTimestamp()} 🏀 - resultsController - Fetching bracket structure`);
+    console.log("=== Incoming Request Headers ===");
+    console.log("x-addon-sso:", req.headers["x-addon-sso"]);
     const bracket = await fetchBracketStructure();
     res.status(200).json({ success: true, data: bracket });
   } catch (error) {
