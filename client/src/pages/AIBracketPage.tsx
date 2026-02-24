@@ -9,6 +9,7 @@ import { startAgentSession, deleteAgentSession, sendStreamingMessage } from "../
 import { getBracketStructure } from "../services/api";
 
 const PICK_PATTERN = /(?:PICK|UPSET\s+ALERT):\s*(\S+)\s*->\s*(\S+)/gi;
+const REASONING_STORAGE_KEY = "agentforce_reasoning";
 
 // Sequential prompts — sent one at a time so the agent doesn't stall and ask for confirmation.
 // Each prompt is scoped to a single round so the response stays focused and parseable.
@@ -34,8 +35,9 @@ const AIBracketPage = () => {
   const [hasGenerated, setHasGenerated] = useState(() => state.aiPicks.length > 0);
   const [sessionStatus, setSessionStatus] = useState<"idle" | "starting" | "active" | "error">("idle");
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  // Accumulated reasoning content across all rounds — never resets mid-generation
-  const [allContent, setAllContent] = useState("");
+  // Accumulated reasoning content across all rounds — persisted to localStorage so it
+  // survives page refreshes and navigation.
+  const [allContent, setAllContent] = useState<string>(() => localStorage.getItem(REASONING_STORAGE_KEY) ?? "");
 
   // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
   const aiTextRef = useRef("");
@@ -45,7 +47,11 @@ const AIBracketPage = () => {
     onChunk: (chunk) => {
       aiTextRef.current += chunk;
       // Keep accumulated display content in sync (never wiped between rounds)
-      setAllContent((prev) => prev + chunk);
+      setAllContent((prev) => {
+        const next = prev + chunk;
+        localStorage.setItem(REASONING_STORAGE_KEY, next);
+        return next;
+      });
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
         // Strip all markdown artifacts the agent may wrap around values (* ` [ ])
@@ -107,6 +113,7 @@ const AIBracketPage = () => {
     aiTextRef.current = "";
     dispatchedPicksRef.current.clear();
     setAllContent("");
+    localStorage.removeItem(REASONING_STORAGE_KEY);
     setIsGenerating(true);
     setHasGenerated(false);
 
