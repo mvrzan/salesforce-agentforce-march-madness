@@ -168,13 +168,13 @@ const AIBracketPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {(hasGenerated || isStreaming) && (
+          {(hasGenerated || isStreaming) && !isPanelOpen && (
             <button
-              onClick={() => setIsPanelOpen((o) => !o)}
+              onClick={() => setIsPanelOpen(true)}
               className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
             >
               <Bot size={14} />
-              {isPanelOpen ? "Hide Reasoning" : "Show Reasoning"}
+              Show Reasoning
             </button>
           )}
           <button
@@ -211,7 +211,13 @@ const AIBracketPage = () => {
       {/* Reasoning panel – fixed right overlay, never squeezes the bracket */}
       {isPanelOpen && (
         <div className="fixed right-0 top-14 bottom-0 w-96 z-40 flex flex-col shadow-2xl">
-          <ReasoningPanel content={allContent} isStreaming={isStreaming} error={error} title="Agentforce Reasoning" />
+          <ReasoningPanel
+            content={allContent}
+            isStreaming={isStreaming}
+            error={error}
+            title="Agentforce Reasoning"
+            onClose={() => setIsPanelOpen(false)}
+          />
         </div>
       )}
     </div>
