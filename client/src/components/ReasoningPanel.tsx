@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -7,9 +8,10 @@ interface ReasoningPanelProps {
   isStreaming: boolean;
   error?: string | null;
   title?: string;
+  onClose?: () => void;
 }
 
-const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning" }: ReasoningPanelProps) => {
+const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning", onClose }: ReasoningPanelProps) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,10 +26,19 @@ const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning" }:
         <span className="text-orange-400 text-sm">🤖</span>
         <span className="text-sm font-semibold text-gray-200">{title}</span>
         {isStreaming && (
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse" />
             <span className="text-xs text-orange-400">Thinking...</span>
           </div>
+        )}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="ml-auto p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+            aria-label="Close reasoning panel"
+          >
+            <X size={16} />
+          </button>
         )}
       </div>
 
