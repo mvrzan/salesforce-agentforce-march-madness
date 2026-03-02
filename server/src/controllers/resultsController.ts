@@ -22,17 +22,13 @@ export const getTeams = async (_req: Request, res: Response): Promise<void> => {
 export const getBracketStructure = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log(`${getCurrentTimestamp()} 🏀 - resultsController - Fetching bracket structure`);
-    console.log("=== Incoming Request Headers ===");
-    console.log("x-addon-sso:", req.headers["x-addon-sso"]);
-    console.log("headers:", req.headers);
-    Object.entries(req.headers).forEach(([key, value]) => {
-      console.log(`${key}: ${value}`);
-    });
     const bracket = await fetchBracketStructure();
+
     res.status(200).json({ success: true, data: bracket });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`${getCurrentTimestamp()} ❌ - resultsController - getBracketStructure error: ${message}`);
+
     res.status(500).json({ success: false, error: message });
   }
 };
