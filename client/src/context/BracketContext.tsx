@@ -187,13 +187,16 @@ const initialState: BracketState = {
 const bracketReducer = (state: BracketState, action: BracketAction): BracketState => {
   switch (action.type) {
     case "SET_REAL_BRACKET": {
-      const newMatchupIds = new Set(action.payload.rounds.flatMap((r) => r.matchups.map((m) => m.id)));
+      // Use lowercase IDs for existence checks so picks stored with lowercase matchupIds
+      // (as dispatched by the AI streaming parser) still match correctly.
+      const newMatchupIds = new Set(action.payload.rounds.flatMap((r) => r.matchups.map((m) => m.id.toLowerCase())));
 
       // Strip preset winners so user/AI brackets only reflect picks, not baked-in 2025 results
       const cleanPayload = clearWinners(action.payload);
 
       // Detect bracket source change (e.g. static fallback → live ESPN data)
-      const needsMigration = state.userPicks.length > 0 && state.userPicks.some((p) => !newMatchupIds.has(p.matchupId));
+      const needsMigration =
+        state.userPicks.length > 0 && state.userPicks.some((p) => !newMatchupIds.has(p.matchupId.toLowerCase()));
       const resolvedPicks = needsMigration ? migratePicks(state.userPicks, cleanPayload) : state.userPicks;
 
       // Re-apply user picks whenever bracket is freshly loaded or source changed
@@ -204,7 +207,8 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
       }
 
       // Re-apply AI picks if any are stored
-      const needsAiMigration = state.aiPicks.length > 0 && state.aiPicks.some((p) => !newMatchupIds.has(p.matchupId));
+      const needsAiMigration =
+        state.aiPicks.length > 0 && state.aiPicks.some((p) => !newMatchupIds.has(p.matchupId.toLowerCase()));
       const resolvedAiPicks = needsAiMigration ? migratePicks(state.aiPicks, cleanPayload) : state.aiPicks;
       const shouldRestoreAi = !state.aiBracket || needsAiMigration;
       let restoredAiBracket: Bracket | null = state.aiBracket;
