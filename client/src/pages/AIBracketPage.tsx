@@ -7,24 +7,80 @@ import { useBracket } from "../context/BracketContext";
 import { useSSE } from "../hooks/useSSE";
 import { startAgentSession, deleteAgentSession, sendStreamingMessage } from "../services/api";
 import { getBracketStructure } from "../services/api";
+import { type Round, type Bracket } from "../types/tournament";
 
 const PICK_PATTERN = /(?:PICK|UPSET\s+ALERT):\s*(\S+)\s*->\s*(\S+)/gi;
 const REASONING_STORAGE_KEY = "agentforce_reasoning";
 
-// Sequential prompts — sent one at a time so the agent doesn't stall and ask for confirmation.
-// Each prompt is scoped to a single round so the response stays focused and parseable.
-// Format instructions belong in the Agentforce system prompt / topic config, not here.
-const ROUND_PROMPTS = [
-  `I need you to provide your picks for every Round of 64 matchup across all 4 regions.`,
+// Each prompt is scoped to a small number of matchups to stay well within the
+// agent's response length limit. R64 is split per-region (8 picks each) because
+// asking for all 32 at once is the most common cause of incomplete responses.
+interface RoundPrompt {
+  text: string;
+  rounds: Round[];
+  regions?: string[];
+}
 
-  `Now provide your picks for every Round of 32 matchup across all 4 regions, based on your Round of 64 picks.`,
-
-  `Now provide your picks for every Sweet 16 matchup across all 4 regions.`,
-
-  `Now provide your picks for every Elite 8 matchup across all 4 regions.`,
-
-  `Finally, provide your picks for the Final Four (FF-1, FF-2) and Championship (CHAMP-1).`,
+const ROUND_PROMPTS: RoundPrompt[] = [
+  {
+    text: `Provide your picks for all 8 Round of 64 matchups in the East region.`,
+    rounds: ["Round of 64"],
+    regions: ["East"],
+  },
+  {
+    text: `Provide your picks for all 8 Round of 64 matchups in the West region.`,
+    rounds: ["Round of 64"],
+    regions: ["West"],
+  },
+  {
+    text: `Provide your picks for all 8 Round of 64 matchups in the South region.`,
+    rounds: ["Round of 64"],
+    regions: ["South"],
+  },
+  {
+    text: `Provide your picks for all 8 Round of 64 matchups in the Midwest region.`,
+    rounds: ["Round of 64"],
+    regions: ["Midwest"],
+  },
+  {
+    text: `Now provide your picks for every Round of 32 matchup across all 4 regions, based on your Round of 64 picks.`,
+    rounds: ["Round of 32"],
+  },
+  {
+    text: `Now provide your picks for every Sweet 16 matchup across all 4 regions.`,
+    rounds: ["Sweet 16"],
+  },
+  {
+    text: `Now provide your picks for every Elite 8 matchup across all 4 regions.`,
+    rounds: ["Elite 8"],
+  },
+  {
+    text: `Finally, provide your picks for the Final Four (FF-1, FF-2) and Championship (CHAMP-1).`,
+    rounds: ["Final Four", "Championship"],
+  },
 ];
+
+/**
+ * Returns the matchup IDs expected from a given prompt that are not yet in
+ * dispatchedPicks. Used to build a targeted retry prompt.
+ */
+const getMissingMatchupIds = (
+  bracket: Bracket,
+  rounds: Round[],
+  regions: string[] | undefined,
+  dispatched: Set<string>,
+): string[] => {
+  const expected: string[] = [];
+  for (const roundName of rounds) {
+    const bracketRound = bracket.rounds.find((r) => r.round === roundName);
+    if (!bracketRound) continue;
+    for (const matchup of bracketRound.matchups) {
+      if (regions && !regions.includes(matchup.region as string)) continue;
+      expected.push(matchup.id);
+    }
+  }
+  return expected.filter((id) => !dispatched.has(id.toLowerCase()));
+};
 
 const AIBracketPage = () => {
   const { state, dispatch } = useBracket();
@@ -123,10 +179,21 @@ const AIBracketPage = () => {
       // Auto-open the reasoning panel when generation starts
       setIsPanelOpen(true);
 
-      // Send one prompt per round sequentially so the agent never stalls
-      for (const prompt of ROUND_PROMPTS) {
-        const fetchPromise = sendStreamingMessage(agentSessionId, prompt, sequenceRef.current++);
+      // Send one prompt per round/region sequentially so the agent never stalls
+      for (const { text, rounds, regions } of ROUND_PROMPTS) {
+        const fetchPromise = sendStreamingMessage(agentSessionId, text, sequenceRef.current++);
         await stream(fetchPromise);
+
+        // Gap detection: if the agent missed any matchups, retry once with only
+        // the missing IDs so we don't re-request ones already dispatched.
+        if (state.realBracket) {
+          const missing = getMissingMatchupIds(state.realBracket, rounds, regions, dispatchedPicksRef.current);
+          if (missing.length > 0) {
+            const retryPrompt = `You missed picks for these matchups: ${missing.join(", ")}. Please provide your picks for them now.`;
+            const retryFetch = sendStreamingMessage(agentSessionId, retryPrompt, sequenceRef.current++);
+            await stream(retryFetch);
+          }
+        }
       }
 
       setIsGenerating(false);
