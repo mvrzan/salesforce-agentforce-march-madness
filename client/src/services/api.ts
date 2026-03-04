@@ -93,3 +93,34 @@ export const sendStreamingMessage = async (
     body: JSON.stringify({ sessionId, message, sequenceId }),
   });
 };
+
+// ── Agentforce Bracket (server-side prompts) ──────────────────────────────────
+export const streamBracketRound = async (
+  sessionId: string,
+  roundIndex: number,
+  sequenceId: number,
+): Promise<Response> => {
+  const path = "/api/v1/af/bracket/round";
+  const headers = await buildHeaders("POST", path);
+  return fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify({ sessionId, roundIndex, sequenceId }),
+  });
+};
+
+export const streamBracketRetry = async (
+  sessionId: string,
+  missingMatchupIds: string[],
+  sequenceId: number,
+): Promise<Response> => {
+  const path = "/api/v1/af/bracket/retry";
+  const headers = await buildHeaders("POST", path);
+  return fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify({ sessionId, missingMatchupIds, sequenceId }),
+  });
+};
