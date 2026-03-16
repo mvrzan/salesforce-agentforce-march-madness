@@ -54,9 +54,3 @@ export interface SaveBracketRequest {
   sessionId: string;
   picks: PickPayload[];
 }
-
-export interface BracketScore {
-  total: number;
-  byRound: Record<Round, number>;
-  maxPossible: number;
-}
