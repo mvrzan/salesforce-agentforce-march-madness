@@ -90,9 +90,3 @@ export interface ESPNScoreboard {
   day: { date: string };
   events: ESPNEvent[];
 }
-
-export interface ESPNTournamentEntry {
-  seed: number;
-  region: string;
-  team: ESPNTeam;
-}
