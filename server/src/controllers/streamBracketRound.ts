@@ -1,34 +1,176 @@
 import { type Request, type Response } from "express";
 import { logger } from "../utils/loggingUtil.ts";
 import { getAgentforceAuth, sendAgentMessage, pipeStreamToResponse } from "../services/agentforceService.ts";
+import { fetchBracketStructure } from "../services/espnService.ts";
 
-// Prompt text lives here on the server so it is never exposed in the client bundle.
-// The client sends only a roundIndex (0-based) to select the appropriate prompt.
-const ROUND_PROMPTS: string[] = [
-  "Provide your picks for all 8 Round of 64 matchups in the East region.",
-  "Provide your picks for all 8 Round of 64 matchups in the West region.",
-  "Provide your picks for all 8 Round of 64 matchups in the South region.",
-  "Provide your picks for all 8 Round of 64 matchups in the Midwest region.",
-  "Now provide your picks for every Round of 32 matchup across all 4 regions, based on your Round of 64 picks.",
-  "Now provide your picks for every Sweet 16 matchup across all 4 regions.",
-  "Now provide your picks for every Elite 8 matchup across all 4 regions.",
-  "Finally, provide your picks for the Final Four (FF-1, FF-2) and Championship (CHAMP-1).",
-];
+const TOTAL_ROUND_PROMPTS = 8;
+
+const REGION_ORDER = ["East", "West", "South", "Midwest"] as const;
+
+/**
+ * Builds a prompt for the given roundIndex.
+ *
+ * priorPicks is a map of matchupId (lowercase) -> team abbreviation accumulated
+ * from all previous rounds. For R32+, this lets us resolve "winner of East-R64-1v16"
+ * to the actual team name the agent already picked — making each prompt fully
+ * self-contained and removing all reliance on the LLM recalling prior turns.
+ */
+const buildPrompt = async (roundIndex: number, priorPicks: Record<string, string>): Promise<string> => {
+  console.log("priorPicks", priorPicks);
+  const bracket = await fetchBracketStructure();
+
+  const r64Round = bracket.rounds.find((r) => r.round === "Round of 64");
+  const r32Round = bracket.rounds.find((r) => r.round === "Round of 32");
+  const s16Round = bracket.rounds.find((r) => r.round === "Sweet 16");
+  const e8Round = bracket.rounds.find((r) => r.round === "Elite 8");
+  const ffRound = bracket.rounds.find((r) => r.round === "Final Four");
+  const champRound = bracket.rounds.find((r) => r.round === "Championship");
+
+  // Resolve a matchup ID to the team abbreviation the agent already picked,
+  // falling back to the ID itself so the prompt is never empty.
+  const resolveWinner = (matchupId: string): string => priorPicks[matchupId.toLowerCase()] ?? `winner-of-${matchupId}`;
+
+  // Round of 64 — one region per prompt (indexes 0–3)
+  if (roundIndex <= 3) {
+    const region = REGION_ORDER[roundIndex]!;
+    const matchups = r64Round?.matchups.filter((m) => m.region === region) ?? [];
+    const lines = matchups
+      .map((m) => {
+        const top = m.topTeam?.abbreviation ?? "TBD";
+        const bot = m.bottomTeam?.abbreviation ?? "TBD";
+        return `${m.id} (${top} vs ${bot})`;
+      })
+      .join("\n");
+    return (
+      `Provide your picks for all ${matchups.length} Round of 64 matchups in the ${region} region.\n\n` +
+      `You MUST output a PICK line for every matchup listed below — no skipping:\n${lines}`
+    );
+  }
+
+  // Round of 32 (index 4)
+  // Standard NCAA pairing: slot order within region corresponds to seed pairings
+  // 1v16+8v9, 5v12+4v13, 6v11+3v14, 7v10+2v15.
+  // We find each R64 game by its seed-encoded ID, then resolve the winner from priorPicks.
+  if (roundIndex === 4) {
+    const SLOT_TOP_SEEDS: [number, number][] = [
+      [1, 8],
+      [5, 4],
+      [6, 3],
+      [7, 2],
+    ];
+    const findR64Id = (region: string, topSeed: number): string =>
+      r64Round?.matchups.filter((m) => m.region === region).find((m) => new RegExp(`-R64-${topSeed}v\\d+$`).test(m.id))
+        ?.id ?? `${region}-R64-${topSeed}v?`;
+
+    const lines = REGION_ORDER.flatMap((region) => {
+      const r32s = r32Round?.matchups.filter((m) => m.region === region) ?? [];
+      const regionLines = r32s.map((r32m, slotIdx) => {
+        const [sa, sb] = SLOT_TOP_SEEDS[slotIdx] ?? [0, 0];
+        const idA = findR64Id(region, sa);
+        const idB = findR64Id(region, sb);
+        const teamA = resolveWinner(idA);
+        const teamB = resolveWinner(idB);
+        return `${r32m.id} (${teamA} vs ${teamB})`;
+      });
+      return [`\n${region}:`].concat(regionLines);
+    });
+    return (
+      `Now provide your picks for all 16 Round of 32 matchups.\n` +
+      `The participants for each slot are derived from your Round of 64 picks and are shown below.\n\n` +
+      `You MUST output a PICK line for every matchup ID below — no skipping:\n` +
+      lines.join("\n")
+    );
+  }
+
+  // Sweet 16 (index 5)
+  if (roundIndex === 5) {
+    const lines = REGION_ORDER.flatMap((region) => {
+      const r32s = r32Round?.matchups.filter((m) => m.region === region) ?? [];
+      const s16s = s16Round?.matchups.filter((m) => m.region === region) ?? [];
+      const regionLines = s16s.map((s16m, slotIdx) => {
+        const idA = r32s[slotIdx * 2]?.id ?? `${region}-Roundof32-${slotIdx * 2 + 1}`;
+        const idB = r32s[slotIdx * 2 + 1]?.id ?? `${region}-Roundof32-${slotIdx * 2 + 2}`;
+        const teamA = resolveWinner(idA);
+        const teamB = resolveWinner(idB);
+        return `${s16m.id} (${teamA} vs ${teamB})`;
+      });
+      return [`\n${region}:`].concat(regionLines);
+    });
+    return (
+      `Now provide your picks for all 8 Sweet 16 matchups.\n` +
+      `The participants for each slot are derived from your Round of 32 picks and are shown below.\n\n` +
+      `You MUST output a PICK line for every matchup ID below — no skipping:\n` +
+      lines.join("\n")
+    );
+  }
+
+  // Elite 8 (index 6)
+  if (roundIndex === 6) {
+    const lines = REGION_ORDER.flatMap((region) => {
+      const s16s = s16Round?.matchups.filter((m) => m.region === region) ?? [];
+      const e8s = e8Round?.matchups.filter((m) => m.region === region) ?? [];
+      const regionLines = e8s.map((e8m) => {
+        const idA = s16s[0]?.id ?? `${region}-Sweet16-1`;
+        const idB = s16s[1]?.id ?? `${region}-Sweet16-2`;
+        const teamA = resolveWinner(idA);
+        const teamB = resolveWinner(idB);
+        return `${e8m.id} (${teamA} vs ${teamB})`;
+      });
+      return [`\n${region}:`].concat(regionLines);
+    });
+    return (
+      `Now provide your picks for all 4 Elite 8 matchups (one per region).\n` +
+      `The participants for each slot are derived from your Sweet 16 picks and are shown below.\n\n` +
+      `You MUST output a PICK line for every matchup ID below — no skipping:\n` +
+      lines.join("\n")
+    );
+  }
+
+  // Final Four + Championship (index 7)
+  const FF_REGION_PAIRS: [string, string][] = [
+    ["East", "West"],
+    ["South", "Midwest"],
+  ];
+  const getE8Id = (region: string) => e8Round?.matchups.find((m) => m.region === region)?.id ?? `${region}-Elite8-1`;
+  const ffMatchups = ffRound?.matchups ?? [];
+  const champMatchups = champRound?.matchups ?? [];
+  const ffLines = ffMatchups
+    .map((ff, idx) => {
+      const [ra, rb] = FF_REGION_PAIRS[idx] ?? ["?", "?"];
+      const teamA = resolveWinner(getE8Id(ra));
+      const teamB = resolveWinner(getE8Id(rb));
+      return `${ff.id} (${teamA} vs ${teamB})`;
+    })
+    .join("\n");
+  const champId = champMatchups[0]?.id ?? "CHAMP-1";
+  const ff1Id = ffMatchups[0]?.id ?? "FF-1";
+  const ff2Id = ffMatchups[1]?.id ?? "FF-2";
+  const champTeamA = resolveWinner(ff1Id);
+  const champTeamB = resolveWinner(ff2Id);
+  return (
+    `Finally, provide your picks for the Final Four (2 picks) and Championship (1 pick).\n` +
+    `The participants are derived from your Elite 8 picks and are shown below.\n\n` +
+    `Final Four:\n${ffLines}\n\n` +
+    `Championship:\n${champId} (${champTeamA} vs ${champTeamB})\n\n` +
+    `You MUST output a PICK line for all 3 IDs — no skipping.`
+  );
+};
 
 const streamBracketRound = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { sessionId, roundIndex, sequenceId } = req.body as {
+    const { sessionId, roundIndex, sequenceId, priorPicks } = req.body as {
       sessionId: string;
       roundIndex: number;
       sequenceId: number;
+      priorPicks?: Record<string, string>;
     };
 
-    if (typeof roundIndex !== "number" || roundIndex < 0 || roundIndex >= ROUND_PROMPTS.length) {
-      res.status(400).json({ message: `Invalid roundIndex: must be 0–${ROUND_PROMPTS.length - 1}` });
+    if (typeof roundIndex !== "number" || roundIndex < 0 || roundIndex >= TOTAL_ROUND_PROMPTS) {
+      res.status(400).json({ message: `Invalid roundIndex: must be 0–${TOTAL_ROUND_PROMPTS - 1}` });
       return;
     }
 
-    const message = ROUND_PROMPTS[roundIndex]!;
+    const message = await buildPrompt(roundIndex, priorPicks ?? {});
     logger.info("streamBracketRound.ts", `Round ${roundIndex}, Session: ${sessionId}, Sequence: ${sequenceId}`);
 
     const { accessToken } = await getAgentforceAuth();
