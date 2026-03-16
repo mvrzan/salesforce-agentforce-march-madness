@@ -144,7 +144,9 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
     const headline = comp.notes?.[0]?.headline ?? "";
     // type.abbreviation may not be set on pre-game scheduled events; fall back to headline
     const isTournament =
-      comp.type.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship");
+      comp.type.abbreviation === TOURNAMENT_TYPE_ABBREVIATION ||
+      headline.includes("Men's Basketball Championship") ||
+      comp.tournamentId === 22;
     if (!isTournament) return false;
     // Drop games where every competitor is TBD — no useful data
     if (comp.competitors.every(isTBDCompetitor)) return false;
@@ -337,7 +339,9 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
     const comp = e.competitions[0];
     const headline = comp?.notes?.[0]?.headline ?? "";
     const isTournament =
-      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship");
+      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION ||
+      headline.includes("Men's Basketball Championship") ||
+      comp?.tournamentId === 22;
     // ESPN uses "First Round" (pre-2026) and "1st Round" (2026+)
     const isR64 = headline.includes("First Round") || headline.includes("1st Round");
     return isTournament && isR64;
@@ -469,7 +473,9 @@ export const fetchTournamentMatchups = async (): Promise<{ matchups: Matchup[]; 
     const comp = e.competitions[0];
     const headline = comp?.notes?.[0]?.headline ?? "";
     return (
-      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship")
+      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION ||
+      headline.includes("Men's Basketball Championship") ||
+      comp?.tournamentId === 22
     );
   });
 
