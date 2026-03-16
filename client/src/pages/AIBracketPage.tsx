@@ -144,6 +144,22 @@ const AIBracketPage = () => {
     setIsGenerating(true);
     setHasGenerated(false);
 
+    // Re-fetch the bracket before generation so the frontend state is in sync with
+    // whatever data the agent's tool calls will return from the same server cache.
+    // Without this, the frontend may hold a stale bracket (e.g. 2025 static data
+    // cached on first page load) while the agent gets a fresher ESPN bracket with
+    // different matchup IDs — causing every pick to be silently dropped.
+    let currentBracket: Bracket | null = state.realBracket;
+    try {
+      const bracketRes = await getBracketStructure();
+      if (bracketRes.success) {
+        dispatch({ type: "SET_REAL_BRACKET", payload: bracketRes.data });
+        currentBracket = bracketRes.data;
+      }
+    } catch {
+      // Non-fatal: proceed with whatever bracket is already in state
+    }
+
     try {
       const agentSessionId = sessionId ?? (await initSession());
 
@@ -159,8 +175,10 @@ const AIBracketPage = () => {
 
         // Gap detection: if the agent missed any matchups, retry once with only
         // the missing IDs so we don't re-request ones already dispatched.
-        if (state.realBracket) {
-          const missing = getMissingMatchupIds(state.realBracket, rounds, regions, dispatchedPicksRef.current);
+        // Use currentBracket (not state.realBracket) so we're always comparing against
+        // the same snapshot we synced with the agent at the start of generation.
+        if (currentBracket) {
+          const missing = getMissingMatchupIds(currentBracket, rounds, regions, dispatchedPicksRef.current);
           if (missing.length > 0) {
             const retryFetch = streamBracketRetry(agentSessionId, missing, sequenceRef.current++);
             await stream(retryFetch);
