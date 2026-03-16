@@ -193,8 +193,24 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
       if (winnerComp) winner = winnerComp === topComp ? topTeam : bottomTeam;
     }
 
+    const slotIndex = gamesBySlot.get(key)!.length;
+    const topSeed = Math.min(seedA, seedB);
+    const bottomSeed = Math.max(seedA, seedB);
+    const semanticId =
+      round === "Round of 64"
+        ? `${region}-R64-${topSeed}v${bottomSeed}`
+        : round === "Round of 32"
+          ? `${region}-Roundof32-${slotIndex + 1}`
+          : round === "Sweet 16"
+            ? `${region}-Sweet16-${slotIndex + 1}`
+            : round === "Elite 8"
+              ? `${region}-Elite8-${slotIndex + 1}`
+              : round === "Final Four"
+                ? `FF-${slotIndex + 1}`
+                : "CHAMP-1";
+
     gamesBySlot.get(key)!.push({
-      id: event.id,
+      id: semanticId,
       round,
       region,
       topTeam,
@@ -220,7 +236,14 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
   const regions: Region[] = ["East", "West", "South", "Midwest"];
   const allMatchups: Matchup[] = [];
 
-  // Regional rounds — fill any missing slots with empty matchups
+  const ROUND_SLUG: Partial<Record<Round, string>> = {
+    "Round of 64": "R64",
+    "Round of 32": "Roundof32",
+    "Sweet 16": "Sweet16",
+    "Elite 8": "Elite8",
+  };
+
+  // Regional rounds — fill any missing slots with empty matchups using semantic IDs
   for (const round of ["Round of 64", "Round of 32", "Sweet 16", "Elite 8"] as Round[]) {
     for (const region of regions) {
       const key = `${round}::${region}`;
@@ -228,8 +251,11 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
       const expected = REGIONAL_COUNTS[round] ?? 0;
       allMatchups.push(...games);
       for (let i = games.length; i < expected; i++) {
+        const slug = ROUND_SLUG[round]!;
+        // R64 placeholders use seed slots; later rounds use sequential slot numbers
+        const slotId = round === "Round of 64" ? `${i + 1}v${16 - i}` : `${i + 1}`;
         allMatchups.push({
-          id: `${region}-${round.replace(/ /g, "")}-empty-${i + 1}`,
+          id: `${region}-${slug}-${slotId}`,
           round,
           region,
           topTeam: null,
