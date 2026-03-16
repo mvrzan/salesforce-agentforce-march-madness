@@ -6,10 +6,11 @@ const streamBracketRetry = async (req: Request, res: Response): Promise<void> =>
   try {
     logger.info("streamBracketRetry.ts", "Request received");
 
-    const { sessionId, missingMatchupIds, sequenceId } = req.body as {
+    const { sessionId, missingMatchupIds, sequenceId, priorPicks } = req.body as {
       sessionId: string;
       missingMatchupIds: string[];
       sequenceId: number;
+      priorPicks?: Record<string, string>;
     };
 
     if (!Array.isArray(missingMatchupIds) || missingMatchupIds.length === 0) {
@@ -17,7 +18,21 @@ const streamBracketRetry = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const message = `You missed picks for these matchups: ${missingMatchupIds.join(", ")}. Please provide picks for each one now.`;
+    // Annotate each missing ID with the resolved participants from priorPicks where possible
+    const picks = priorPicks ?? {};
+    const resolveWinner = (id: string) => picks[id.toLowerCase()] ?? `winner-of-${id}`;
+    const annotated = missingMatchupIds.map((id) => {
+      // For non-R64 slots, try to show which teams are expected based on prior picks
+      const teamHint = picks[id.toLowerCase()];
+      return teamHint ? `${id} (already picked: ${teamHint} — confirm or correct)` : id;
+    });
+    const lines = annotated.join("\n");
+    const message =
+      `You did not provide picks for the following matchup IDs. ` +
+      `You MUST output one PICK line per ID below — no exceptions, no prose, no refusals. ` +
+      `Format: PICK: MATCHUP_ID -> TEAM_ABBREVIATION\n\n${lines}`;
+
+    void resolveWinner; // suppress unused warning — kept for future use
     logger.info(
       "streamBracketRetry.ts",
       `Session: ${sessionId}, Sequence: ${sequenceId}, Missing: ${missingMatchupIds.join(", ")}`,
