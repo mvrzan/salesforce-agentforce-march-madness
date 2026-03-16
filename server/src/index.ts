@@ -2,8 +2,9 @@ import express from "express";
 import cors from "cors";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { getCurrentTimestamp } from "./utils/loggingUtil.ts";
-import { errorHandler } from "./middleware/errorHandler.ts";
+import { logger } from "./utils/loggingUtil.ts";
+import { validateEnv } from "./types/env.ts";
+import { requestLoggerMiddleware } from "./middleware/requestLoggerMiddleware.ts";
 import agentforceApiRoutes from "./routes/agentforceApi.ts";
 import resultsRoutes from "./routes/resultsRoutes.ts";
 import bracketRoutes from "./routes/bracketRoutes.ts";
@@ -13,7 +14,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(__dirname, "..", "public");
 
 const app = express();
-const port = process.env.APP_PORT || process.env.PORT || 3000;
+const port = process.env.APP_PORT ?? process.env.PORT ?? 3000;
+
+validateEnv();
 
 app.use(
   cors({
@@ -24,6 +27,7 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestLoggerMiddleware);
 
 // Routes
 app.use(agentforceApiRoutes);
@@ -32,16 +36,10 @@ app.use(bracketRoutes);
 app.use(agentforceTools);
 
 app.use(express.static(publicDir));
-
-// SPA fallback — serve index.html for any route not matched by the API so that
-// React Router can handle client-side navigation after a hard refresh.
 app.get("/{*splat}", (_req, res) => {
   res.sendFile(join(publicDir, "index.html"));
 });
 
-// Centralized error handler — must be last
-app.use(errorHandler);
-
 app.listen(port, () => {
-  console.log(`${getCurrentTimestamp()} 🎬 - index - Server listening on port: ${port}`);
+  logger.info("index.ts", `Server listening on port: ${port}`);
 });
