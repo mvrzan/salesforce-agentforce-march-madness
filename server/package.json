@@ -4,7 +4,7 @@
   "description": "An Express server handling backend needs for the Agentforce March Madness demo.",
   "main": "src/index.js",
   "scripts": {
-    "dev": "node --env-file=./src/.env --watch src/index.ts",
+    "dev": "node --env-file=./.env --watch src/index.ts",
     "start": "node --max-old-space-size=460 src/index.ts"
   },
   "keywords": [
