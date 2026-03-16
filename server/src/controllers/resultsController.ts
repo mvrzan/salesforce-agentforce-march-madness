@@ -5,7 +5,8 @@ import { buildStaticBracket } from "../data/tournamentField2025.ts";
 import { type Bracket, type Matchup } from "../types/tournament.ts";
 import { type ESPNEvent } from "../types/api.ts";
 
-const NCAA_TOURNAMENT_ID = 22;
+// Stable ESPN type abbreviation for NCAA Tournament competitions.
+const TOURNAMENT_TYPE_ABBREVIATION = "TRNMNT";
 
 export const getTeams = async (_req: Request, res: Response): Promise<void> => {
   try {
@@ -86,8 +87,14 @@ export const getLiveScores = async (_req: Request, res: Response): Promise<void>
     console.log(`${getCurrentTimestamp()} 📡 - resultsController - Fetching live scores`);
     const events = await fetchLiveScores();
 
-    // Only show NCAA tournament games (tournamentId 22), not regular season/conference games
-    const tournamentEvents = events.filter((e) => e.competitions[0]?.tournamentId === NCAA_TOURNAMENT_ID);
+    // Only show NCAA tournament games, not regular season/conference games
+    const tournamentEvents = events.filter((e) => {
+      const comp = e.competitions[0];
+      const headline = comp?.notes?.[0]?.headline ?? "";
+      return (
+        comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship")
+      );
+    });
 
     // Require at least 8 games to be considered an active tournament day (minimum for one R64 session).
     // A single archived/stale game from a prior year should not prevent the fallback from triggering.
