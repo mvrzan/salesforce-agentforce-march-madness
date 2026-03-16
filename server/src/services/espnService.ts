@@ -14,8 +14,8 @@ import { buildStaticBracket, TOURNAMENT_FIELD_2025, buildTeamFromStaticEntry } f
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
 
-// NCAA Men's Basketball Championship tournament ID on ESPN
-const NCAA_TOURNAMENT_ID = 22;
+// Stable ESPN abbreviation for NCAA Tournament games — does not change year to year.
+const TOURNAMENT_TYPE_ABBREVIATION = "TRNMNT";
 
 // ── In-process TTL cache ──────────────────────────────────────────────────────
 // Prevents redundant fan-out ESPN fetches on every request and keeps memory usage
@@ -54,6 +54,11 @@ const LIVE_SCORES_CACHE_TTL = 30 * 1000; // 30 seconds — live scores need to b
 const getTournamentDates = (year: number): string[] => {
   const y = String(year);
   return [
+    `${y}0313`,
+    `${y}0314`,
+    `${y}0315`,
+    `${y}0316`,
+    `${y}0317`, // Selection Sunday weekend + First Four (day 1)
     `${y}0318`,
     `${y}0319`, // First Four
     `${y}0320`,
@@ -66,7 +71,8 @@ const getTournamentDates = (year: number): string[] => {
     `${y}0330`, // Elite 8
     `${y}0404`,
     `${y}0405`, // Final Four
-    `${y}0406`, // Championship
+    `${y}0406`,
+    `${y}0407`, // Championship
   ];
 };
 
@@ -81,13 +87,17 @@ const getTournamentDates = (year: number): string[] => {
  *   "Men's Basketball Championship"  (championship game)
  */
 const parseRoundFromHeadline = (headline: string): Round | null => {
-  if (headline.includes("First Round")) return "Round of 64";
-  if (headline.includes("Second Round")) return "Round of 32";
+  // ESPN has used both "First Round" (pre-2026) and "1st Round" (2026+)
+  if (headline.includes("First Round") || headline.includes("1st Round")) return "Round of 64";
+  // ESPN has used both "Second Round" (pre-2026) and "2nd Round" (2026+)
+  if (headline.includes("Second Round") || headline.includes("2nd Round")) return "Round of 32";
   if (headline.includes("Sweet 16") || headline.includes("Sweet Sixteen")) return "Sweet 16";
   if (headline.includes("Elite Eight") || headline.includes("Elite 8")) return "Elite 8";
   if (headline.includes("Final Four")) return "Final Four";
-  // Championship game — headline is just "Men's Basketball Championship" with no round qualifier
-  if (/Men's Basketball Championship\s*$/.test(headline.trim())) return "Championship";
+  // Championship game — ESPN uses "National Championship" (2026+) or the headline ends with
+  // "Basketball Championship" with no round qualifier (pre-2026)
+  if (headline.includes("National Championship") || /Basketball Championship\s*$/.test(headline.trim()))
+    return "Championship";
   return null;
 };
 
@@ -122,16 +132,23 @@ const buildTeamFromESPN = (competitor: ESPNCompetitor, region: Region | "Final F
 
 // ── Bracket builder from ESPN events ─────────────────────────────────────────
 
+const isTBDCompetitor = (comp: ESPNCompetitor): boolean => comp.team.id === "-1" || comp.team.id === "-2";
+
 const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
-  // Keep only real NCAA Tournament games (not First Four, not TBD placeholders)
+  // Keep only real NCAA Tournament games (not First Four).
+  // Games where one team is TBD (First Four winner not yet decided) are allowed through —
+  // buildTeamFromESPN returns null for TBD competitors, producing a "Team vs TBD" matchup.
+  // Games where BOTH competitors are TBD are useless placeholders and are dropped.
   const tournamentGames = events.filter((event) => {
     const comp = event.competitions[0];
     if (!comp) return false;
-    if (comp.type.abbreviation !== "TRNMNT") return false;
-    if (comp.tournamentId !== NCAA_TOURNAMENT_ID) return false;
-    // Skip TBD slot games
-    if (comp.competitors.some((c) => c.team.id === "-1" || c.team.id === "-2")) return false;
     const headline = comp.notes?.[0]?.headline ?? "";
+    // type.abbreviation may not be set on pre-game scheduled events; fall back to headline
+    const isTournament =
+      comp.type.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship");
+    if (!isTournament) return false;
+    // Drop games where every competitor is TBD — no useful data
+    if (comp.competitors.every(isTBDCompetitor)) return false;
     if (headline.includes("First Four")) return false;
     return true;
   });
@@ -160,11 +177,11 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
     const seedA = compA.curatedRank?.current ?? 99;
     const seedB = compB.curatedRank?.current ?? 99;
 
-    // Top = lower seed number (better seed)
+    // Top = lower seed number (better seed); TBD competitor always has seed 99 so it sorts to bottom
     const topComp = seedA <= seedB ? compA : compB;
     const bottomComp = seedA <= seedB ? compB : compA;
-    const topTeam = buildTeamFromESPN(topComp, region);
-    const bottomTeam = buildTeamFromESPN(bottomComp, region);
+    const topTeam = isTBDCompetitor(topComp) ? null : buildTeamFromESPN(topComp, region);
+    const bottomTeam = isTBDCompetitor(bottomComp) ? null : buildTeamFromESPN(bottomComp, region);
 
     const isComplete = comp.status.type.completed;
     const isLive = comp.status.type.state === "in";
@@ -274,7 +291,7 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
 
 const fetchScoreboardForDate = async (date: string): Promise<ESPNEvent[]> => {
   try {
-    const res = await fetch(`${ESPN_BASE}/scoreboard?groups=100&dates=${date}&limit=100`);
+    const res = await fetch(`${ESPN_BASE}/scoreboard?calendar=blacklist&groups=100&dates=${date}&limit=100`);
     if (!res.ok) return [];
     const data = (await res.json()) as ESPNScoreboard;
     return data.events ?? [];
@@ -313,15 +330,18 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
   // Deduplicate events by id (same game can appear across adjacent date queries)
   const uniqueEvents = Array.from(new Map(allEvents.map((e) => [e.id, e])).values());
 
-  // Count real (non-TBD) Round of 64 games to decide if ESPN has published the full bracket
+  // Count all Round of 64 games (including TBD slots) to confirm the bracket has been published.
+  // TBD slots appear when a team's spot is still determined by a First Four game — they are valid
+  // proof the bracket is set, even though the opponent isn't known yet. buildBracketFromESPNGames
+  // already skips TBD games, leaving those as empty placeholder slots in the UI.
   const r64Count = uniqueEvents.filter((e) => {
     const comp = e.competitions[0];
     const headline = comp?.notes?.[0]?.headline ?? "";
-    return (
-      comp?.tournamentId === NCAA_TOURNAMENT_ID &&
-      headline.includes("First Round") &&
-      comp.competitors.every((c) => c.team.id !== "-1" && c.team.id !== "-2")
-    );
+    const isTournament =
+      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship");
+    // ESPN uses "First Round" (pre-2026) and "1st Round" (2026+)
+    const isR64 = headline.includes("First Round") || headline.includes("1st Round");
+    return isTournament && isR64;
   }).length;
 
   if (r64Count >= 32) {
@@ -332,7 +352,7 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
   }
 
   console.log(
-    `${getCurrentTimestamp()} ⚠️ - espnService - Only ${r64Count} R64 games found (tournament not yet announced). Using 2024 static bracket as fallback.`,
+    `${getCurrentTimestamp()} ⚠️ - espnService - Only ${r64Count} R64 games found (tournament not yet announced). Using 2025 static bracket as fallback.`,
   );
   const staticBracket = buildStaticBracket();
   setCached("bracket", staticBracket, BRACKET_CACHE_TTL);
@@ -349,7 +369,7 @@ export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
   console.log(`${getCurrentTimestamp()} 📡 - espnService - Fetching live scores`);
 
   try {
-    const response = await fetch(`${ESPN_BASE}/scoreboard?groups=100&limit=100`);
+    const response = await fetch(`${ESPN_BASE}/scoreboard?calendar=blacklist&groups=100&limit=100`);
 
     if (!response.ok) {
       throw new AppError(`ESPN API returned ${response.status}`, 502);
