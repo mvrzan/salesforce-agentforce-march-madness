@@ -1,17 +1,16 @@
 import { type Request, type Response, type NextFunction } from "express";
 import crypto from "crypto";
-import { getCurrentTimestamp } from "../utils/loggingUtil.ts";
+import { logger } from "../utils/loggingUtil.ts";
 
 export function validateSignature(req: Request, res: Response, next: NextFunction) {
-  console.log(`${getCurrentTimestamp()} 🕵️‍♀️ - middleware - Request received...`);
+  logger.info("validateSignature.ts", "Request received");
 
   const secret = process.env.API_SECRET;
   const path = req.originalUrl || req.url;
   const requestMethod = req.method;
 
   if (!secret) {
-    console.error(`${getCurrentTimestamp()} ❌ - middleware - API_SECRET not configured in environment`);
-
+    logger.error("validateSignature.ts", "API_SECRET not configured in environment");
     return res.status(500).json({ error: "Server configuration error" });
   }
 
@@ -19,8 +18,7 @@ export function validateSignature(req: Request, res: Response, next: NextFunctio
   const receivedSignature = req.headers["x-signature"];
 
   if (!timestamp || !receivedSignature || Array.isArray(timestamp) || Array.isArray(receivedSignature)) {
-    console.error(`${getCurrentTimestamp()} ❌ - middleware - Missing authentication headers`);
-
+    logger.error("validateSignature.ts", "Missing authentication headers");
     return res.status(401).json({ error: "Missing authentication headers" });
   }
 
@@ -29,8 +27,7 @@ export function validateSignature(req: Request, res: Response, next: NextFunctio
   const timeDiff = Math.abs(now - requestTime);
 
   if (timeDiff > 300000) {
-    console.error(`${getCurrentTimestamp()} ❌ - middleware - Request timestamp expired. Time diff: ${timeDiff}ms`);
-
+    logger.error("validateSignature.ts", `Request timestamp expired. Time diff: ${timeDiff}ms`);
     return res.status(401).json({ error: "Request expired" });
   }
 
@@ -40,14 +37,14 @@ export function validateSignature(req: Request, res: Response, next: NextFunctio
   const expectedSignature = hmac.digest("hex");
 
   if (receivedSignature !== expectedSignature) {
-    console.log(`${getCurrentTimestamp()} ❌ - middleware - Invalid signature!`);
-    console.log(`${getCurrentTimestamp()} 🤔 - middleware - Expected`, expectedSignature);
-    console.log(`${getCurrentTimestamp()} 🤔 - middleware - Received`, receivedSignature);
-    console.log(`${getCurrentTimestamp()} 🤔 - middleware - Message`, message);
-
+    logger.error("validateSignature.ts", "Invalid signature", {
+      expected: expectedSignature,
+      received: receivedSignature,
+      message,
+    });
     return res.status(401).json({ error: "Invalid signature" });
   }
 
-  console.log(`${getCurrentTimestamp()} ✅ - middleware - Request signature validated!`);
+  logger.info("validateSignature.ts", "Request signature validated");
   next();
 }
