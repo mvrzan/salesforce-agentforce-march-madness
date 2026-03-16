@@ -69,6 +69,9 @@ const AIBracketPage = () => {
   // Track accumulated text and already-dispatched picks to avoid duplicates mid-stream
   const aiTextRef = useRef("");
   const dispatchedPicksRef = useRef<Set<string>>(new Set());
+  // matchupId (lowercase) -> team abbreviation — sent to server so later-round prompts
+  // can resolve actual team names without relying on LLM context recall.
+  const picksMapRef = useRef<Record<string, string>>({});
 
   const { isStreaming, error, stream, reset } = useSSE({
     onChunk: (chunk) => {
@@ -86,6 +89,7 @@ const AIBracketPage = () => {
         const winnerId = match[2].replace(/[*`[\]]/g, "");
         if (!dispatchedPicksRef.current.has(matchupId)) {
           dispatchedPicksRef.current.add(matchupId);
+          picksMapRef.current[matchupId] = winnerId;
           dispatch({ type: "ADD_AI_PICK", payload: { matchupId, winnerId } });
         }
       }
@@ -139,6 +143,7 @@ const AIBracketPage = () => {
     dispatch({ type: "RESET_AI_BRACKET" });
     aiTextRef.current = "";
     dispatchedPicksRef.current.clear();
+    picksMapRef.current = {};
     setAllContent("");
     localStorage.removeItem(REASONING_STORAGE_KEY);
     setIsGenerating(true);
@@ -167,20 +172,23 @@ const AIBracketPage = () => {
       setIsPanelOpen(true);
 
       // Send one prompt per round/region sequentially so the agent never stalls.
-      // The server selects the prompt text by roundIndex — nothing is sent from the client.
+      // picksMapRef (matchupId -> teamAbbrev) is passed to the server each round so
+      // it can resolve actual team names into the next prompt — no LLM recall needed.
       for (let i = 0; i < ROUND_PROMPTS.length; i++) {
         const { rounds, regions } = ROUND_PROMPTS[i];
-        const fetchPromise = streamBracketRound(agentSessionId, i, sequenceRef.current++);
+        const fetchPromise = streamBracketRound(agentSessionId, i, sequenceRef.current++, { ...picksMapRef.current });
         await stream(fetchPromise);
 
-        // Gap detection: if the agent missed any matchups, retry once with only
-        // the missing IDs so we don't re-request ones already dispatched.
+        // Gap detection: retry up to 2 times for any matchups the agent skipped.
         // Use currentBracket (not state.realBracket) so we're always comparing against
         // the same snapshot we synced with the agent at the start of generation.
         if (currentBracket) {
-          const missing = getMissingMatchupIds(currentBracket, rounds, regions, dispatchedPicksRef.current);
-          if (missing.length > 0) {
-            const retryFetch = streamBracketRetry(agentSessionId, missing, sequenceRef.current++);
+          for (let attempt = 0; attempt < 3; attempt++) {
+            const missing = getMissingMatchupIds(currentBracket, rounds, regions, dispatchedPicksRef.current);
+            if (missing.length === 0) break;
+            const retryFetch = streamBracketRetry(agentSessionId, missing, sequenceRef.current++, {
+              ...picksMapRef.current,
+            });
             await stream(retryFetch);
           }
         }
