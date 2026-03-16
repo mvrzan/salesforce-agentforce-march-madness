@@ -16,7 +16,6 @@ const REGION_ORDER = ["East", "West", "South", "Midwest"] as const;
  * self-contained and removing all reliance on the LLM recalling prior turns.
  */
 const buildPrompt = async (roundIndex: number, priorPicks: Record<string, string>): Promise<string> => {
-  console.log("priorPicks", priorPicks);
   const bracket = await fetchBracketStructure();
 
   const r64Round = bracket.rounds.find((r) => r.round === "Round of 64");
@@ -26,9 +25,34 @@ const buildPrompt = async (roundIndex: number, priorPicks: Record<string, string
   const ffRound = bracket.rounds.find((r) => r.round === "Final Four");
   const champRound = bracket.rounds.find((r) => r.round === "Championship");
 
-  // Resolve a matchup ID to the team abbreviation the agent already picked,
-  // falling back to the ID itself so the prompt is never empty.
-  const resolveWinner = (matchupId: string): string => priorPicks[matchupId.toLowerCase()] ?? `winner-of-${matchupId}`;
+  // Only include picks from the immediately preceding round in the prompt.
+  // Sending the full accumulated map adds noise and can confuse the agent.
+  const R64_PATTERN = /-r64-/i;
+  const R32_PATTERN = /-roundof32-/i;
+  const S16_PATTERN = /-sweet16-/i;
+  const E8_PATTERN = /-elite8-/i;
+  const FF_PATTERN = /^ff-/i;
+
+  const filterPicks = (pattern: RegExp): Record<string, string> =>
+    Object.fromEntries(Object.entries(priorPicks).filter(([k]) => pattern.test(k)));
+
+  // What each round needs to build its participant annotations
+  const relevantPicks: Record<string, string> =
+    roundIndex <= 3
+      ? {} // R64 prompts need nothing — teams come from ESPN bracket data
+      : roundIndex === 4
+        ? filterPicks(R64_PATTERN) // R32 needs R64 picks
+        : roundIndex === 5
+          ? filterPicks(R32_PATTERN) // S16 needs R32 picks
+          : roundIndex === 6
+            ? filterPicks(S16_PATTERN) // E8 needs S16 picks
+            : { ...filterPicks(E8_PATTERN), ...filterPicks(FF_PATTERN) }; // FF+Champ needs E8+FF picks
+
+  logger.debug("streamBracketRound.ts", `Round ${roundIndex} relevantPicks: ${JSON.stringify(relevantPicks)}`);
+
+  // Resolve a matchup ID to the team the agent already picked in a prior round.
+  const resolveWinner = (matchupId: string): string =>
+    relevantPicks[matchupId.toLowerCase()] ?? `winner-of-${matchupId}`;
 
   // Round of 64 — one region per prompt (indexes 0–3)
   if (roundIndex <= 3) {
@@ -172,6 +196,7 @@ const streamBracketRound = async (req: Request, res: Response): Promise<void> =>
 
     const message = await buildPrompt(roundIndex, priorPicks ?? {});
     logger.info("streamBracketRound.ts", `Round ${roundIndex}, Session: ${sessionId}, Sequence: ${sequenceId}`);
+    logger.info("streamBracketRound.ts", `Prompt for round ${roundIndex}:\n${message}`);
 
     const { accessToken } = await getAgentforceAuth();
 
