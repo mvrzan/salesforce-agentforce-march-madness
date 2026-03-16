@@ -1,13 +1,13 @@
 import { Router } from "express";
 import { getBracketStructure, getLiveScores, getTeams } from "../controllers/resultsController.ts";
-import { getCurrentTimestamp } from "../utils/loggingUtil.ts";
+import { logger } from "../utils/loggingUtil.ts";
 import initSalesforceSdk from "../middleware/herokuServiceMesh.ts";
 
 const agentforceTools = Router();
 
 const initHerokuMiddleware = async () => {
   try {
-    console.log(`${getCurrentTimestamp()} 🔧 - Initializing Agent Action routes...`);
+    logger.info("agentforceTools.ts", "Initializing Agent Action routes");
     const { salesforceMiddleware, withSalesforceConfig } = await initSalesforceSdk();
 
     agentforceTools.get(
@@ -31,10 +31,10 @@ const initHerokuMiddleware = async () => {
       getLiveScores,
     );
 
-    console.log(`${getCurrentTimestamp()} ✅ - agentActions - Agent Action routes registered successfully!`);
+    logger.info("agentforceTools.ts", "Agent Action routes registered successfully");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`${getCurrentTimestamp()} ❌ - agentActions -Failed to initialize Agent Action routes: ${message}`);
+    logger.error("agentforceTools.ts", `Failed to initialize Agent Action routes: ${message}`);
   }
 };
 
