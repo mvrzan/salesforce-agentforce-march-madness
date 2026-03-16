@@ -1,4 +1,4 @@
-import { getCurrentTimestamp } from "../utils/loggingUtil.ts";
+import { logger } from "../utils/loggingUtil.ts";
 import {
   type Team,
   type Matchup,
@@ -9,13 +9,12 @@ import {
   ROUND_ORDER,
 } from "../types/tournament.ts";
 import { type ESPNEvent, type ESPNScoreboard, type ESPNCompetitor } from "../types/api.ts";
-import { AppError } from "../middleware/errorHandler.ts";
 import { buildStaticBracket, TOURNAMENT_FIELD_2025, buildTeamFromStaticEntry } from "../data/tournamentField2025.ts";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball";
 
 // Stable ESPN abbreviation for NCAA Tournament games — does not change year to year.
-const TOURNAMENT_TYPE_ABBREVIATION = "TRNMNT";
+export const TOURNAMENT_TYPE_ABBREVIATION = "TRNMNT";
 
 // ── In-process TTL cache ──────────────────────────────────────────────────────
 // Prevents redundant fan-out ESPN fetches on every request and keeps memory usage
@@ -312,12 +311,12 @@ const fetchScoreboardForDate = async (date: string): Promise<ESPNEvent[]> => {
 export const fetchBracketStructure = async (): Promise<Bracket> => {
   const cached = getCached<Bracket>("bracket");
   if (cached) {
-    console.log(`${getCurrentTimestamp()} 📋 - espnService - Returning cached bracket`);
+    logger.debug("espnService.ts", "Returning cached bracket");
     return cached;
   }
 
   const year = new Date().getFullYear();
-  console.log(`${getCurrentTimestamp()} 🏀 - espnService - Fetching live bracket for ${year} tournament`);
+  logger.info("espnService.ts", `Fetching live bracket for ${year} tournament`);
 
   const dates = getTournamentDates(year);
 
@@ -345,14 +344,15 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
   }).length;
 
   if (r64Count >= 32) {
-    console.log(`${getCurrentTimestamp()} ✅ - espnService - Found ${r64Count} R64 games, building live bracket`);
+    logger.info("espnService.ts", `Found ${r64Count} R64 games, building live bracket`);
     const bracket = buildBracketFromESPNGames(uniqueEvents);
     setCached("bracket", bracket, BRACKET_CACHE_TTL);
     return bracket;
   }
 
-  console.log(
-    `${getCurrentTimestamp()} ⚠️ - espnService - Only ${r64Count} R64 games found (tournament not yet announced). Using 2025 static bracket as fallback.`,
+  logger.warn(
+    "espnService.ts",
+    `Only ${r64Count} R64 games found (tournament not yet announced). Using 2025 static bracket as fallback.`,
   );
   const staticBracket = buildStaticBracket();
   setCached("bracket", staticBracket, BRACKET_CACHE_TTL);
@@ -362,17 +362,17 @@ export const fetchBracketStructure = async (): Promise<Bracket> => {
 export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
   const cached = getCached<ESPNEvent[]>("liveScores");
   if (cached) {
-    console.log(`${getCurrentTimestamp()} 📋 - espnService - Returning cached live scores`);
+    logger.debug("espnService.ts", "Returning cached live scores");
     return cached;
   }
 
-  console.log(`${getCurrentTimestamp()} 📡 - espnService - Fetching live scores`);
+  logger.info("espnService.ts", "Fetching live scores");
 
   try {
     const response = await fetch(`${ESPN_BASE}/scoreboard?calendar=blacklist&groups=100&limit=100`);
 
     if (!response.ok) {
-      throw new AppError(`ESPN API returned ${response.status}`, 502);
+      throw new Error(`ESPN API returned ${response.status}`);
     }
 
     const data = (await response.json()) as ESPNScoreboard;
@@ -380,9 +380,8 @@ export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
     setCached("liveScores", events, LIVE_SCORES_CACHE_TTL);
     return events;
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    console.error(`${getCurrentTimestamp()} ❌ - espnService - Failed to fetch live scores`, err);
-    throw new AppError("Failed to fetch live scores from ESPN", 502);
+    logger.error("espnService.ts", "Failed to fetch live scores", err);
+    throw new Error("Failed to fetch live scores from ESPN");
   }
 };
 
@@ -391,7 +390,7 @@ export const fetchLiveScores = async (): Promise<ESPNEvent[]> => {
  * team list always matches whatever source (live or static) is in use.
  */
 export const fetchTeams = async (): Promise<Team[]> => {
-  console.log(`${getCurrentTimestamp()} 🏀 - espnService - Fetching teams`);
+  logger.info("espnService.ts", "Fetching teams");
   const bracket = await fetchBracketStructure();
   const r64Round = bracket.rounds.find((r) => r.round === "Round of 64");
   if (!r64Round) return TOURNAMENT_FIELD_2025.map(buildTeamFromStaticEntry);
@@ -402,4 +401,93 @@ export const fetchTeams = async (): Promise<Team[]> => {
     if (matchup.bottomTeam) teams.set(matchup.bottomTeam.id, matchup.bottomTeam);
   }
   return Array.from(teams.values());
+};
+
+// ── Live-scores matchup mapper ────────────────────────────────────────────────
+
+const mapESPNEventToMatchup = (event: ESPNEvent): Matchup => {
+  const competition = event.competitions[0];
+  const homeTeam = competition?.competitors.find((c) => c.homeAway === "home");
+  const awayTeam = competition?.competitors.find((c) => c.homeAway === "away");
+  const isComplete = competition?.status.type.completed ?? false;
+  const isLive = competition?.status.type.state === "in";
+
+  const buildTeam = (competitor: ESPNCompetitor | undefined) => {
+    if (!competitor) return null;
+    return {
+      id: competitor.team.id,
+      name: competitor.team.displayName,
+      shortName: competitor.team.shortDisplayName,
+      abbreviation: competitor.team.abbreviation,
+      seed: competitor.curatedRank?.current ?? 0,
+      region: "East" as const,
+      logo: competitor.team.logos?.[0]?.href,
+      espnId: competitor.team.id,
+    };
+  };
+
+  const awayTeamMapped = buildTeam(awayTeam);
+  const homeTeamMapped = buildTeam(homeTeam);
+
+  let winner = null;
+  if (isComplete) {
+    const winnerCompetitor = competition?.competitors.find((c) => c.winner);
+    if (winnerCompetitor) {
+      winner = winnerCompetitor.homeAway === "home" ? homeTeamMapped : awayTeamMapped;
+    }
+  }
+
+  return {
+    id: event.id,
+    round: "Round of 64",
+    region: "East",
+    topTeam: awayTeamMapped,
+    bottomTeam: homeTeamMapped,
+    topScore: awayTeam ? parseInt(awayTeam.score, 10) || 0 : undefined,
+    bottomScore: homeTeam ? parseInt(homeTeam.score, 10) || 0 : undefined,
+    winner,
+    isComplete,
+    isLive,
+    gameTime: competition?.status.type.shortDetail,
+    espnEventId: event.id,
+  };
+};
+
+// Minimum number of concurrent tournament games to trust the live feed as an active tournament day.
+// A single stale archived game from a prior year should not prevent the static fallback from firing.
+const ACTIVE_TOURNAMENT_THRESHOLD = 8;
+
+/**
+ * Fetches live scores, filters for NCAA Tournament games, and maps them to Matchup objects.
+ * Falls back to the hardcoded 2025 static bracket when fewer than ACTIVE_TOURNAMENT_THRESHOLD
+ * tournament games are found (e.g. off-season, stale archived data).
+ */
+export const fetchTournamentMatchups = async (): Promise<{ matchups: Matchup[]; isFallback: boolean }> => {
+  const events = await fetchLiveScores();
+
+  const tournamentEvents = events.filter((e) => {
+    const comp = e.competitions[0];
+    const headline = comp?.notes?.[0]?.headline ?? "";
+    return (
+      comp?.type?.abbreviation === TOURNAMENT_TYPE_ABBREVIATION || headline.includes("Men's Basketball Championship")
+    );
+  });
+
+  if (tournamentEvents.length >= ACTIVE_TOURNAMENT_THRESHOLD) {
+    logger.info("espnService.ts", `Found ${tournamentEvents.length} live tournament games`);
+    return { matchups: tournamentEvents.map(mapESPNEventToMatchup), isFallback: false };
+  }
+
+  if (tournamentEvents.length > 0) {
+    logger.warn(
+      "espnService.ts",
+      `Found only ${tournamentEvents.length} tournament game(s) — likely stale archived data, using 2025 static bracket as fallback`,
+    );
+  } else {
+    logger.warn("espnService.ts", "No live tournament games found, using 2025 static bracket as fallback");
+  }
+
+  const staticBracket = buildStaticBracket();
+  const matchups = staticBracket.rounds.flatMap((r) => r.matchups).filter((m) => m.topTeam && m.bottomTeam);
+  return { matchups, isFallback: true };
 };
