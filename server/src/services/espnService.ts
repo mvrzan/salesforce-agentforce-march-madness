@@ -243,17 +243,39 @@ const buildBracketFromESPNGames = (events: ESPNEvent[]): Bracket => {
     "Elite 8": "Elite8",
   };
 
+  // Standard NCAA bracket seed order within a region for Round of 64 (top to bottom).
+  // This order is fixed every year and determines which R32 slot each R64 winner feeds into.
+  // applyPickToLocal in the frontend propagates winners by positional index (Math.floor(mi/2)),
+  // so the array order here MUST match this canonical sequence for propagation to be correct.
+  const R64_SEED_ORDER = [1, 8, 5, 4, 6, 3, 7, 2];
+
+  const sortGames = (games: Matchup[], round: Round): Matchup[] => {
+    if (round === "Round of 64") {
+      return [...games].sort((a, b) => {
+        const seedA = parseInt(a.id.match(/-R64-(\d+)v/)?.[1] ?? "99");
+        const seedB = parseInt(b.id.match(/-R64-(\d+)v/)?.[1] ?? "99");
+        return R64_SEED_ORDER.indexOf(seedA) - R64_SEED_ORDER.indexOf(seedB);
+      });
+    }
+    // R32/S16/E8: sort by trailing slot number so position is always 1-based sequential
+    return [...games].sort((a, b) => {
+      const numA = parseInt(a.id.match(/-(\d+)$/)?.[1] ?? "99");
+      const numB = parseInt(b.id.match(/-(\d+)$/)?.[1] ?? "99");
+      return numA - numB;
+    });
+  };
+
   // Regional rounds — fill any missing slots with empty matchups using semantic IDs
   for (const round of ["Round of 64", "Round of 32", "Sweet 16", "Elite 8"] as Round[]) {
     for (const region of regions) {
       const key = `${round}::${region}`;
-      const games = gamesBySlot.get(key) ?? [];
+      const games = sortGames(gamesBySlot.get(key) ?? [], round);
       const expected = REGIONAL_COUNTS[round] ?? 0;
       allMatchups.push(...games);
       for (let i = games.length; i < expected; i++) {
         const slug = ROUND_SLUG[round]!;
         // R64 placeholders use seed slots; later rounds use sequential slot numbers
-        const slotId = round === "Round of 64" ? `${i + 1}v${16 - i}` : `${i + 1}`;
+        const slotId = round === "Round of 64" ? `${R64_SEED_ORDER[i]}v${16 - R64_SEED_ORDER[i]!}` : `${i + 1}`;
         allMatchups.push({
           id: `${region}-${slug}-${slotId}`,
           round,
