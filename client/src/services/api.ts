@@ -99,6 +99,7 @@ export const streamBracketRound = async (
   sessionId: string,
   roundIndex: number,
   sequenceId: number,
+  priorPicks: Record<string, string>,
 ): Promise<Response> => {
   const path = "/api/v1/af/bracket/round";
   const headers = await buildHeaders("POST", path);
@@ -106,7 +107,7 @@ export const streamBracketRound = async (
     method: "POST",
     credentials: "include",
     headers,
-    body: JSON.stringify({ sessionId, roundIndex, sequenceId }),
+    body: JSON.stringify({ sessionId, roundIndex, sequenceId, priorPicks }),
   });
 };
 
@@ -114,6 +115,7 @@ export const streamBracketRetry = async (
   sessionId: string,
   missingMatchupIds: string[],
   sequenceId: number,
+  priorPicks: Record<string, string>,
 ): Promise<Response> => {
   const path = "/api/v1/af/bracket/retry";
   const headers = await buildHeaders("POST", path);
@@ -121,6 +123,6 @@ export const streamBracketRetry = async (
     method: "POST",
     credentials: "include",
     headers,
-    body: JSON.stringify({ sessionId, missingMatchupIds, sequenceId }),
+    body: JSON.stringify({ sessionId, missingMatchupIds, sequenceId, priorPicks }),
   });
 };
