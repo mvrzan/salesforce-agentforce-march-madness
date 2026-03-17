@@ -9,7 +9,7 @@ import streamBracketAdapt from "../controllers/streamBracketAdapt.ts";
 const agentforceApiRoutes = Router();
 
 agentforceApiRoutes.post("/api/v1/af/sessions/:sessionId", validateSignature, startSession);
-agentforceApiRoutes.delete("/api/v1/delete-session", validateSignature, deleteSession);
+agentforceApiRoutes.delete("/api/v1/af/delete-session", validateSignature, deleteSession);
 agentforceApiRoutes.post("/api/v1/af/bracket/round", validateSignature, streamBracketRound);
 agentforceApiRoutes.post("/api/v1/af/bracket/retry", validateSignature, streamBracketRetry);
 agentforceApiRoutes.post("/api/v1/af/bracket/adapt", validateSignature, streamBracketAdapt);
