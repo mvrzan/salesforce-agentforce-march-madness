@@ -5,6 +5,7 @@ import { validateSignature } from "../middleware/validateSignature.ts";
 import sendStreamingMessage from "../controllers/sendStreamingMessage.ts";
 import streamBracketRound from "../controllers/streamBracketRound.ts";
 import streamBracketRetry from "../controllers/streamBracketRetry.ts";
+import streamBracketAdapt from "../controllers/streamBracketAdapt.ts";
 
 const agentforceApiRoutes = Router();
 
@@ -13,5 +14,6 @@ agentforceApiRoutes.delete("/api/v1/delete-session", validateSignature, deleteSe
 agentforceApiRoutes.post("/api/v1/send-streaming-message", validateSignature, sendStreamingMessage);
 agentforceApiRoutes.post("/api/v1/af/bracket/round", validateSignature, streamBracketRound);
 agentforceApiRoutes.post("/api/v1/af/bracket/retry", validateSignature, streamBracketRetry);
+agentforceApiRoutes.post("/api/v1/af/bracket/adapt", validateSignature, streamBracketAdapt);
 
 export default agentforceApiRoutes;
