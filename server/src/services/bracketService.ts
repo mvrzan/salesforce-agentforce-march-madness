@@ -1,4 +1,4 @@
-import { type Bracket, type BracketRound, type PickPayload, type Round, ROUND_ORDER } from "../types/tournament.ts";
+import { type Bracket, type BracketRound, type PickPayload, ROUND_ORDER } from "../types/tournament.ts";
 import { fetchBracketStructure } from "./espnService.ts";
 import { logger } from "../utils/loggingUtil.ts";
 
@@ -34,7 +34,7 @@ const applyPicksToBracket = (base: Bracket, picks: PickPayload[]): Bracket => {
       matchup.winner = winner;
 
       // Propagate winner to next round as a participant
-      const currentRoundIndex = ROUND_ORDER.indexOf(round.round as Round);
+      const currentRoundIndex = ROUND_ORDER.indexOf(round.round);
       if (currentRoundIndex < 0 || currentRoundIndex >= ROUND_ORDER.length - 1) continue;
 
       const nextRound = rounds[currentRoundIndex + 1];
@@ -69,44 +69,4 @@ export const saveBracket = async (sessionId: string, picks: PickPayload[]): Prom
   bracketStore.set(sessionId, bracket);
   logger.info("bracketService.ts", `Bracket saved for session ${sessionId}`);
   return bracket;
-};
-
-export const findBracket = (id: string): Bracket | undefined => bracketStore.get(id);
-
-export const scoreUserBracket = async (
-  id: string,
-): Promise<{ total: number; byRound: Record<string, number>; maxPossible: number } | null> => {
-  const userBracket = bracketStore.get(id);
-  if (!userBracket) return null;
-
-  const realBracket = await fetchBracketStructure();
-
-  const pointsPerRound: Record<Round, number> = {
-    "Round of 64": 1,
-    "Round of 32": 2,
-    "Sweet 16": 4,
-    "Elite 8": 8,
-    "Final Four": 16,
-    Championship: 32,
-  };
-
-  let total = 0;
-  const byRound: Record<string, number> = {};
-
-  userBracket.rounds.forEach((userRound) => {
-    const realRound = realBracket.rounds.find((r) => r.round === userRound.round);
-    let roundPoints = 0;
-
-    userRound.matchups.forEach((userMatchup) => {
-      const realMatchup = realRound?.matchups.find((m) => m.id === userMatchup.id);
-      if (realMatchup?.winner && userMatchup.winner?.id === realMatchup.winner.id) {
-        roundPoints += pointsPerRound[userRound.round];
-      }
-    });
-
-    total += roundPoints;
-    byRound[userRound.round] = roundPoints;
-  });
-
-  return { total, byRound, maxPossible: 192 };
 };
