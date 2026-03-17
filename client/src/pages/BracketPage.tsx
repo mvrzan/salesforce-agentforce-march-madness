@@ -93,78 +93,80 @@ const BracketPage = () => {
   const isLiveData = state.realBracket?.id === "bracket-live";
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-12">
-      {/* Header */}
-      <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-black text-white flex items-center gap-2">
-              <ClipboardList size={22} className="text-orange-400" /> My Bracket
-            </h1>
-            {state.realBracket &&
-              (isLiveData ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-900/50 border border-green-600/60 text-green-400 text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  Live ESPN Data
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-900/40 border border-yellow-600/50 text-yellow-400 text-xs font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
-                  2025 Fallback Data
-                </span>
-              ))}
+    <>
+      <main className="flex-1 text-white pb-12">
+        {/* Header */}
+        <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-black text-white flex items-center gap-2">
+                <ClipboardList size={22} className="text-orange-400" /> My Bracket
+              </h1>
+              {state.realBracket &&
+                (isLiveData ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-900/50 border border-green-600/60 text-green-400 text-xs font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    Live ESPN Data
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-900/40 border border-yellow-600/50 text-yellow-400 text-xs font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
+                    2025 Fallback Data
+                  </span>
+                ))}
+            </div>
+            <p className="text-sm text-gray-400 mt-0.5">{totalPicks} / 63 picks made · Click a team to advance them</p>
           </div>
-          <p className="text-sm text-gray-400 mt-0.5">{totalPicks} / 63 picks made · Click a team to advance them</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {saveMessage && <span className="text-sm text-gray-400">{saveMessage}</span>}
-          {isLiveData && (
+          <div className="flex items-center gap-3">
+            {saveMessage && <span className="text-sm text-gray-400">{saveMessage}</span>}
+            {isLiveData && (
+              <button
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
+              >
+                <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+                {isRefreshing ? "Refreshing..." : "Refresh Live Data"}
+              </button>
+            )}
             <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
+              onClick={handleReset}
+              disabled={totalPicks === 0}
+              className="px-4 py-2 bg-gray-700 hover:bg-red-900/60 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
             >
-              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
-              {isRefreshing ? "Refreshing..." : "Refresh Live Data"}
+              Reset Bracket
             </button>
-          )}
-          <button
-            onClick={handleReset}
-            disabled={totalPicks === 0}
-            className="px-4 py-2 bg-gray-700 hover:bg-red-900/60 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
-          >
-            Reset Bracket
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving || totalPicks === 0}
-            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
-          >
-            {isSaving ? "Saving..." : "Save Bracket"}
-          </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving || totalPicks === 0}
+              className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
+            >
+              {isSaving ? "Saving..." : "Save Bracket"}
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Progress bar */}
-      <div className="max-w-screen-2xl mx-auto px-4 mb-6">
-        <div className="h-1.5 rounded-full bg-gray-800">
-          <div
-            className="h-full rounded-full bg-orange-500 transition-all duration-300"
-            style={{ width: `${(totalPicks / 63) * 100}%` }}
+        {/* Progress bar */}
+        <div className="max-w-screen-2xl mx-auto px-4 mb-6">
+          <div className="h-1.5 rounded-full bg-gray-800">
+            <div
+              className="h-full rounded-full bg-orange-500 transition-all duration-300"
+              style={{ width: `${(totalPicks / 63) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Bracket */}
+        <div className="max-w-screen-2xl mx-auto px-4">
+          <BracketTree
+            bracket={state.userBracket}
+            realBracket={state.realBracket}
+            onPick={handlePick}
+            label="Your Picks"
           />
         </div>
-      </div>
-
-      {/* Bracket */}
-      <div className="max-w-screen-2xl mx-auto px-4">
-        <BracketTree
-          bracket={state.userBracket}
-          realBracket={state.realBracket}
-          onPick={handlePick}
-          label="Your Picks"
-        />
-      </div>
-    </div>
+      </main>
+    </>
   );
 };
 
