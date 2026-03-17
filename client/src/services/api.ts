@@ -58,7 +58,7 @@ export const startAgentSession = (sessionId: string) => {
 };
 
 export const deleteAgentSession = (sessionId: string) => {
-  const path = "/api/v1/delete-session";
+  const path = "/api/v1/af/delete-session";
   return apiFetch<{ message: string }>(path, { method: "DELETE", body: JSON.stringify({ sessionId }) }, true);
 };
 
