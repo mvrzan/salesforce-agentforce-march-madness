@@ -31,7 +31,6 @@ A full-stack NCAA March Madness bracket builder where you compete head-to-head a
     - [Agentforce Session Routes](#agentforce-session-routes)
     - [Agentforce Bracket Routes](#agentforce-bracket-routes)
     - [Results Routes](#results-routes)
-    - [Bracket Routes](#bracket-routes)
   - [Tech Stack](#tech-stack)
 - [Configuration](#configuration)
   - [Prerequisites](#prerequisites)
@@ -76,7 +75,7 @@ Key capabilities:
 - **Streaming AI Predictions**: Agentforce responses stream token-by-token via SSE — picks are extracted on-the-fly using regex pattern matching
 - **Adaptive AI**: After real tournament rounds complete, the AI reviews the results and adjusts its remaining predictions accordingly via `POST /api/v1/af/bracket/adapt`
 - **Head-to-Head Scoring**: Compare your bracket against the AI's bracket scored against actual ESPN results using exponential round points (1 → 2 → 4 → 8 → 16 → 32, max 192 points)
-- **Persistent State**: User picks and AI reasoning survive page navigation and refreshes via localStorage
+- **Persistent State**: User picks and AI reasoning survive page navigation and refreshes via localStorage — no backend persistence required
 - **Heroku AppLink Auth**: Salesforce OAuth tokens are retrieved securely via the Heroku AppLink SDK — no credentials stored in environment variables
 
 ---
@@ -99,7 +98,7 @@ Key capabilities:
 
 1. **Bracket Load**: The frontend fetches the full bracket structure from `GET /api/v1/agentforce/results/bracket`, which queries the ESPN Scoreboard API and maps games to the internal tournament model
 2. **ESPN Cache**: The ESPN service caches bracket data for 5 minutes and live scores for 30 seconds to avoid hammering the API on low-RAM Heroku dynos
-3. **User Picks**: As users select winners, picks are saved to localStorage and periodically saved to the backend via `POST /bracket/save`
+3. **User Picks**: As users select winners, picks are saved locally to localStorage and persist across page refreshes
 4. **Live Polling**: The `useLivePolling` hook polls `GET /api/v1/agentforce/results/live` every N seconds to refresh scores for in-progress games
 5. **Adaptive AI**: On the Live page, the AI can review completed round results and call `POST /api/v1/af/bracket/adapt` with actual outcomes to adjust remaining picks
 6. **Scoring**: The Compare page scores both brackets locally against real ESPN results — no additional server call needed
@@ -215,15 +214,6 @@ Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) 
 - **Auth required**: No
 - **Description**: Returns live game scores and statuses from ESPN (cached 30 sec)
 - **Response**: `200 { games: LiveGame[] }`
-
-### Bracket Routes
-
-**`POST /api/v1/bracket/save`**
-
-- **Auth required**: No
-- **Description**: Saves a user's bracket picks to the server-side in-memory store and returns the fully-resolved bracket
-- **Request body**: `{ sessionId: string, picks: PickPayload[] }`
-- **Response**: `200 { success: true, data: Bracket }`
 
 ---
 
