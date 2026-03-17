@@ -51,12 +51,6 @@ export const getLiveScores = () =>
     "/api/v1/results/live",
   );
 
-// ── User Bracket ──────────────────────────────────────────────────────────────
-export const saveBracket = (sessionId: string, picks: import("../types/tournament").PickPayload[]) =>
-  apiFetch<{ success: boolean; data: import("../types/tournament").Bracket }>("/api/v1/bracket/save", {
-    method: "POST",
-    body: JSON.stringify({ sessionId, picks }),
-  });
 
 // ── Agentforce Session ────────────────────────────────────────────────────────
 export const startAgentSession = (sessionId: string) => {
