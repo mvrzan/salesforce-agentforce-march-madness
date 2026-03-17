@@ -511,8 +511,9 @@ const ACTIVE_TOURNAMENT_THRESHOLD = 8;
 
 /**
  * Fetches live scores, filters for NCAA Tournament games, and maps them to Matchup objects.
- * Falls back to the hardcoded 2025 static bracket when fewer than ACTIVE_TOURNAMENT_THRESHOLD
- * tournament games are found (e.g. off-season, stale archived data).
+ * Falls back to the best available bracket (current-year ESPN data if announced, otherwise
+ * the hardcoded 2025 static bracket) when fewer than ACTIVE_TOURNAMENT_THRESHOLD tournament
+ * games are found on the current scoreboard (e.g. between rounds, pre-tipoff, off-season).
  */
 export const fetchTournamentMatchups = async (): Promise<{ matchups: Matchup[]; isFallback: boolean }> => {
   const events = await fetchLiveScores();
@@ -535,13 +536,15 @@ export const fetchTournamentMatchups = async (): Promise<{ matchups: Matchup[]; 
   if (tournamentEvents.length > 0) {
     logger.warn(
       "espnService.ts",
-      `Found only ${tournamentEvents.length} tournament game(s) — likely stale archived data, using 2025 static bracket as fallback`,
+      `Found only ${tournamentEvents.length} tournament game(s) — likely stale archived data, falling back to bracket source`,
     );
   } else {
-    logger.warn("espnService.ts", "No live tournament games found, using 2025 static bracket as fallback");
+    logger.warn("espnService.ts", "No live tournament games found, falling back to bracket source");
   }
 
-  const staticBracket = buildStaticBracket();
-  const matchups = staticBracket.rounds.flatMap((r) => r.matchups).filter((m) => m.topTeam && m.bottomTeam);
+  // Reuse fetchBracketStructure so we get the current-year ESPN bracket when it has already
+  // been announced (e.g. between rounds or before tip-off), rather than always serving 2025 data.
+  const bracket = await fetchBracketStructure();
+  const matchups = bracket.rounds.flatMap((r) => r.matchups).filter((m) => m.topTeam && m.bottomTeam);
   return { matchups, isFallback: true };
 };
