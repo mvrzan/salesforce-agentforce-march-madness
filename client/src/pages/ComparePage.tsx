@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { AlertTriangle, Bot, ClipboardList, Scale } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Bot, ClipboardList, Info, Scale } from "lucide-react";
 import { Link } from "react-router";
 import BracketTree from "../components/BracketTree";
 import ScoreSummaryBar from "../components/ScoreSummaryBar";
@@ -38,6 +38,11 @@ const ComparePage = () => {
   const hasUserBracket = !!state.userBracket;
   const hasAIBracket = !!state.aiBracket;
 
+  const completedGameCount = useMemo(
+    () => state.realBracket?.rounds.reduce((acc, r) => acc + r.matchups.filter((m) => m.isComplete).length, 0) ?? 0,
+    [state.realBracket],
+  );
+
   return (
     <>
       <main className="flex-1 text-white pb-12">
@@ -51,7 +56,8 @@ const ComparePage = () => {
           </div>
           <button
             onClick={handleScore}
-            disabled={!state.realBracket || (!hasUserBracket && !hasAIBracket)}
+            disabled={!state.realBracket || (!hasUserBracket && !hasAIBracket) || completedGameCount === 0}
+            title={completedGameCount === 0 ? "No completed games to score against yet" : undefined}
             className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
           >
             Calculate Scores
@@ -84,6 +90,22 @@ const ComparePage = () => {
                 </Link>
               </div>
             )}
+          </div>
+        )}
+
+        {/* No results yet banner */}
+        {state.realBracket && completedGameCount === 0 && (
+          <div className="max-w-screen-2xl mx-auto px-4 mb-4">
+            <div className="flex items-start gap-3 bg-slate-800/60 border border-slate-600/50 rounded-xl px-4 py-3">
+              <Info size={18} className="text-slate-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-slate-200">No game results yet</p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  The tournament hasn't started or no games have been completed. Scores can only be calculated once real
+                  results are available — check back once games are underway.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
