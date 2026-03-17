@@ -46,7 +46,7 @@ const Footer = () => (
                 <img
                   src={src}
                   alt={alt}
-                  className="h-8 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                  className="h-7 w-auto object-contain opacity-70 group-hover:opacity-100 transition-opacity"
                 />
                 <span className="text-gray-600 text-xs group-hover:text-gray-400 transition-colors">{label}</span>
               </a>
