@@ -43,9 +43,6 @@ const apiFetch = async <T>(path: string, options: RequestInit = {}, signed = fal
 };
 
 // ── Results ──────────────────────────────────────────────────────────────────
-export const getTeams = () =>
-  apiFetch<{ success: boolean; data: import("../types/tournament").Team[] }>("/api/v1/results/teams");
-
 export const getBracketStructure = () =>
   apiFetch<{ success: boolean; data: import("../types/tournament").Bracket }>("/api/v1/results/bracket");
 
@@ -61,12 +58,6 @@ export const saveBracket = (sessionId: string, picks: import("../types/tournamen
     body: JSON.stringify({ sessionId, picks }),
   });
 
-export const fetchBracket = (id: string) =>
-  apiFetch<{ success: boolean; data: import("../types/tournament").Bracket }>(`/api/v1/bracket/${id}`);
-
-export const scoreBracket = (id: string) =>
-  apiFetch<{ success: boolean; data: import("../types/tournament").BracketScore }>(`/api/v1/bracket/${id}/score`);
-
 // ── Agentforce Session ────────────────────────────────────────────────────────
 export const startAgentSession = (sessionId: string) => {
   const path = `/api/v1/af/sessions/${sessionId}`;
@@ -76,22 +67,6 @@ export const startAgentSession = (sessionId: string) => {
 export const deleteAgentSession = (sessionId: string) => {
   const path = "/api/v1/delete-session";
   return apiFetch<{ message: string }>(path, { method: "DELETE", body: JSON.stringify({ sessionId }) }, true);
-};
-
-// ── Agentforce Streaming (returns EventSource-compatible fetch) ───────────────
-export const sendStreamingMessage = async (
-  sessionId: string,
-  message: string,
-  sequenceId: number,
-): Promise<Response> => {
-  const path = "/api/v1/send-streaming-message";
-  const headers = await buildHeaders("POST", path);
-  return fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    credentials: "include",
-    headers,
-    body: JSON.stringify({ sessionId, message, sequenceId }),
-  });
 };
 
 // ── Agentforce Bracket (server-side prompts) ──────────────────────────────────
