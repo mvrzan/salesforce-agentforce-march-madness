@@ -7,7 +7,6 @@ import { validateEnv } from "./types/env.ts";
 import { requestLoggerMiddleware } from "./middleware/requestLoggerMiddleware.ts";
 import agentforceApiRoutes from "./routes/agentforceApi.ts";
 import resultsRoutes from "./routes/resultsRoutes.ts";
-import bracketRoutes from "./routes/bracketRoutes.ts";
 import agentforceTools from "./routes/agentforceTools.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -32,7 +31,6 @@ app.use(requestLoggerMiddleware);
 // Routes
 app.use(agentforceApiRoutes);
 app.use(resultsRoutes);
-app.use(bracketRoutes);
 app.use(agentforceTools);
 
 app.use(express.static(publicDir));
