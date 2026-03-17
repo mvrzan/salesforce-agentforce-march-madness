@@ -2,19 +2,16 @@ import { useEffect, useState } from "react";
 import { ClipboardList, Loader2, RefreshCw, XCircle } from "lucide-react";
 import BracketTree from "../components/BracketTree";
 import { useBracket } from "../context/BracketContext";
-import { getBracketStructure, saveBracket } from "../services/api";
+import { getBracketStructure } from "../services/api";
 import { type Team } from "../types/tournament";
 
 const BracketPage = () => {
   const { state, dispatch, makePick } = useBracket();
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleReset = () => {
     if (!window.confirm("Reset your bracket? All picks will be cleared.")) return;
     dispatch({ type: "RESET_USER_BRACKET" });
-    setSaveMessage(null);
   };
 
   useEffect(() => {
@@ -49,22 +46,6 @@ const BracketPage = () => {
 
   const handlePick = (matchupId: string, winner: Team) => {
     makePick(matchupId, winner);
-    setSaveMessage(null);
-  };
-
-  const handleSave = async () => {
-    if (!state.userBracket) return;
-    setIsSaving(true);
-    try {
-      const res = await saveBracket(state.sessionId, state.userPicks);
-      if (res.success) {
-        setSaveMessage("✅ Bracket saved!");
-      }
-    } catch (err) {
-      setSaveMessage(`❌ ${err instanceof Error ? err.message : "Save failed"}`);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   if (state.isLoadingBracket) {
@@ -118,7 +99,6 @@ const BracketPage = () => {
             <p className="text-sm text-gray-400 mt-0.5">{totalPicks} / 63 picks made · Click a team to advance them</p>
           </div>
           <div className="flex items-center gap-3">
-            {saveMessage && <span className="text-sm text-gray-400">{saveMessage}</span>}
             {isLiveData && (
               <button
                 onClick={handleRefresh}
@@ -135,13 +115,6 @@ const BracketPage = () => {
               className="px-4 py-2 bg-gray-700 hover:bg-red-900/60 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
             >
               Reset Bracket
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isSaving || totalPicks === 0}
-              className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm"
-            >
-              {isSaving ? "Saving..." : "Save Bracket"}
             </button>
           </div>
         </div>
