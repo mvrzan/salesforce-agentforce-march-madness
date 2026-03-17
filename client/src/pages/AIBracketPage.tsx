@@ -137,7 +137,6 @@ const AIBracketPage = () => {
     setSessionStatus("starting");
     const res = await startAgentSession(externalSessionId);
     setSessionId(res.sessionId);
-    dispatch({ type: "SET_AI_SESSION_ID", payload: res.sessionId });
     setSessionStatus("active");
     return res.sessionId;
   };
