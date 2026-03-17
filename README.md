@@ -92,7 +92,7 @@ Key capabilities:
 6. **Pick Extraction**: The frontend's `useSSE` hook accumulates text chunks and extracts picks in real time using the pattern `PICK: [matchupId] -> [winnerId]`
 7. **Retry Logic**: After each round, any matchups the agent missed are collected and a targeted `POST /api/v1/af/bracket/retry` re-prompts the agent for only those picks
 8. **Repeat**: Steps 3–7 repeat for all 8 prompts until the full bracket is complete
-9. **Session Cleanup**: On page unmount, `DELETE /api/v1/delete-session` closes the Agentforce session
+9. **Session Cleanup**: On page unmount, `DELETE /api/v1/af/delete-session` closes the Agentforce session
 
 **Manual Bracket + Live Scoring Flow:**
 
@@ -161,7 +161,7 @@ Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) 
 - **Response**: `200 { sessionId, messages }`
 - **Error responses**: `500` if AppLink auth or Agentforce API fails
 
-**`DELETE /api/v1/delete-session`**
+**`DELETE /api/v1/af/delete-session`**
 
 - **Auth required**: Yes (AppLink)
 - **Description**: Closes an active Agentforce session
