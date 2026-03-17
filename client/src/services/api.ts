@@ -126,3 +126,20 @@ export const streamBracketRetry = async (
     body: JSON.stringify({ sessionId, missingMatchupIds, sequenceId, priorPicks }),
   });
 };
+
+export const streamBracketAdapt = async (
+  sessionId: string,
+  sequenceId: number,
+  round: string,
+  completedMatchups: import("../types/tournament").Matchup[],
+  aiBracket: import("../types/tournament").Bracket | null,
+): Promise<Response> => {
+  const path = "/api/v1/af/bracket/adapt";
+  const headers = await buildHeaders("POST", path);
+  return fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: JSON.stringify({ sessionId, sequenceId, round, completedMatchups, aiBracket }),
+  });
+};
