@@ -12,11 +12,11 @@ interface ReasoningPanelProps {
 }
 
 const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning", onClose }: ReasoningPanelProps) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isStreaming) {
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (isStreaming && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
     }
   }, [content, isStreaming]);
 
@@ -42,7 +42,7 @@ const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning", o
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 text-sm text-gray-300 leading-relaxed">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 text-sm text-gray-300 leading-relaxed">
         {error ? (
           <div className="text-red-400 text-sm">{error}</div>
         ) : content ? (
@@ -105,7 +105,6 @@ const ReasoningPanel = ({ content, isStreaming, error, title = "AI Reasoning", o
             {isStreaming ? "Starting response..." : "AI reasoning will appear here once you generate a bracket."}
           </div>
         )}
-        <div ref={bottomRef} />
       </div>
     </div>
   );
