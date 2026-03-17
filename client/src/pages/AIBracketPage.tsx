@@ -82,7 +82,7 @@ const AIBracketPage = () => {
       // "Getting bracket structure...PICK: ..." with no newline in between.
       setAllContent((prev) => {
         const raw = prev + chunk;
-        const normalized = raw.replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/g, "$1\n$2");
+        const normalized = raw.replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/g, "$1\n\n$2");
         localStorage.setItem(REASONING_STORAGE_KEY, normalized);
         return normalized;
       });
