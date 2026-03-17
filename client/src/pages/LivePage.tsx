@@ -4,106 +4,10 @@ import { v4 as uuidv4 } from "uuid";
 import { useLivePolling } from "../hooks/useLivePolling";
 import { useSSE } from "../hooks/useSSE";
 import ReasoningPanel from "../components/ReasoningPanel";
+import LiveMatchupCard from "../components/LiveMatchupCard";
 import { useBracket } from "../context/BracketContext";
-import { sendStreamingMessage, startAgentSession, deleteAgentSession } from "../services/api";
-import { type Round, ROUND_ORDER, type Matchup, type Bracket } from "../types/tournament";
-
-const buildCurrentPicksSummary = (aiBracket: Bracket | null): string => {
-  if (!aiBracket) return "No prior picks on record.";
-
-  const lines: string[] = [];
-  for (const round of aiBracket.rounds) {
-    const pickedMatchups = round.matchups.filter((m) => m.winner != null);
-    if (pickedMatchups.length === 0) continue;
-    lines.push(`\n${round.round}:`);
-    for (const m of pickedMatchups) {
-      const top = m.topTeam ? `(${m.topTeam.seed}) ${m.topTeam.name}` : "TBD";
-      const bottom = m.bottomTeam ? `(${m.bottomTeam.seed}) ${m.bottomTeam.name}` : "TBD";
-      lines.push(`  ${top} vs ${bottom} → Your pick: ${m.winner?.name}`);
-    }
-  }
-
-  return lines.length > 0 ? lines.join("\n") : "No prior picks on record.";
-};
-
-const ADAPT_PROMPT = (round: Round, matchups: Matchup[], aiBracket: Bracket | null): string => {
-  const results = matchups
-    .filter((m) => m.isComplete && m.winner)
-    .map((m) => `${m.topTeam?.name ?? "TBD"} vs ${m.bottomTeam?.name ?? "TBD"} → Winner: ${m.winner?.name}`)
-    .join("\n");
-
-  const picksSummary = buildCurrentPicksSummary(aiBracket);
-
-  return `Here is a summary of your current bracket predictions:
-${picksSummary}
-
-Round "${round}" is now complete. Actual results:
-
-${results}
-
-Please analyze the upsets, identify surprises, and adapt your remaining bracket predictions based on what actually happened. Provide updated PICK: [ID] -> [WINNER_ID] entries for any rounds not yet completed.`;
-};
-
-const LiveMatchupCard = ({ matchup }: { matchup: Matchup }) => {
-  const { topTeam, bottomTeam, topScore, bottomScore, isLive, isComplete, gameTime } = matchup;
-
-  return (
-    <div
-      className={`bg-gray-900 border rounded-xl p-4 ${isLive ? "border-green-600 shadow-[0_0_12px_rgba(34,197,94,0.2)]" : "border-gray-700"}`}
-    >
-      {isLive && (
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs text-green-400 font-bold uppercase tracking-wider">Live</span>
-          {gameTime && <span className="text-xs text-gray-500 ml-auto">{gameTime}</span>}
-        </div>
-      )}
-      {isComplete && <div className="text-xs text-gray-500 uppercase tracking-wider mb-2">Final</div>}
-      {!isLive && !isComplete && gameTime && <div className="text-xs text-gray-500 mb-2">{gameTime}</div>}
-
-      <div className="flex flex-col gap-1">
-        {[
-          { team: topTeam, score: topScore },
-          { team: bottomTeam, score: bottomScore },
-        ].map(({ team, score }, i) => {
-          const isWinner = isComplete && matchup.winner?.id === team?.id;
-          const isLoser = isComplete && matchup.winner != null && !isWinner;
-          return (
-            <div key={i}>
-              {i === 1 && <div className="h-px bg-gray-800 my-1" />}
-              <div
-                className={`flex items-center justify-between gap-2 rounded-lg px-1.5 py-1 -mx-1.5 transition-colors ${
-                  isWinner ? "bg-green-950/50 text-white" : isLoser ? "text-gray-600" : "text-gray-300"
-                }`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {team?.seed && (
-                    <span
-                      className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${isLoser ? "bg-gray-800 text-gray-600" : "bg-gray-700"}`}
-                    >
-                      {team.seed}
-                    </span>
-                  )}
-                  <span
-                    className={`text-sm truncate ${isLoser ? "line-through decoration-gray-600" : isWinner ? "font-bold" : ""}`}
-                  >
-                    {team?.shortName ?? "TBD"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {score !== undefined && (
-                    <span className={`text-sm font-mono ${isWinner ? "font-bold text-green-300" : ""}`}>{score}</span>
-                  )}
-                  {isWinner && <span className="text-green-400 text-xs">✓</span>}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+import { streamBracketAdapt, startAgentSession, deleteAgentSession } from "../services/api";
+import { type Round, ROUND_ORDER } from "../types/tournament";
 
 const PICK_PATTERN = /(?:PICK|UPSET\s+ALERT):\s*(\S+)\s*->\s*(\S+)/gi;
 
@@ -114,6 +18,11 @@ const LivePage = () => {
   const [isAdapting, setIsAdapting] = useState(false);
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
   const liveSessionIdRef = useRef<string | null>(null);
+  const roundMatchups = state.liveMatchups.filter((m) => m.round === activeRound);
+  const liveGames = roundMatchups.filter((m) => m.isLive);
+  const completedGames = roundMatchups.filter((m) => m.isComplete);
+  const upcomingGames = roundMatchups.filter((m) => !m.isLive && !m.isComplete);
+  const roundsWithGames = ROUND_ORDER.filter((r) => state.liveMatchups.some((m) => m.round === r));
 
   // Keep ref in sync so the unmount cleanup always sees the latest session ID
   useEffect(() => {
@@ -167,21 +76,19 @@ const LivePage = () => {
       }
 
       const relevantMatchups = state.liveMatchups.filter((m) => m.round === activeRound && m.isComplete);
-      const prompt = ADAPT_PROMPT(activeRound, relevantMatchups, state.aiBracket);
-      const fetchPromise = sendStreamingMessage(agentSessionId, prompt, Date.now());
+      const fetchPromise = streamBracketAdapt(
+        agentSessionId,
+        Date.now(),
+        activeRound,
+        relevantMatchups,
+        state.aiBracket,
+      );
       await stream(fetchPromise);
     } catch (err) {
       setIsAdapting(false);
       console.error("Adapt error:", err);
     }
   };
-
-  const roundMatchups = state.liveMatchups.filter((m) => m.round === activeRound);
-  const liveGames = roundMatchups.filter((m) => m.isLive);
-  const completedGames = roundMatchups.filter((m) => m.isComplete);
-  const upcomingGames = roundMatchups.filter((m) => !m.isLive && !m.isComplete);
-
-  const roundsWithGames = ROUND_ORDER.filter((r) => state.liveMatchups.some((m) => m.round === r));
 
   return (
     <>
