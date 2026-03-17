@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock, Radio, RefreshCw } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { useLivePolling } from "../hooks/useLivePolling";
 import { useSSE } from "../hooks/useSSE";
 import ReasoningPanel from "../components/ReasoningPanel";
 import { useBracket } from "../context/BracketContext";
-import { sendStreamingMessage, startAgentSession } from "../services/api";
+import { sendStreamingMessage, startAgentSession, deleteAgentSession } from "../services/api";
 import { type Round, ROUND_ORDER, type Matchup, type Bracket } from "../types/tournament";
 
 const buildCurrentPicksSummary = (aiBracket: Bracket | null): string => {
@@ -112,6 +112,22 @@ const LivePage = () => {
   const { refresh } = useLivePolling(true);
   const [activeRound, setActiveRound] = useState<Round>("Round of 64");
   const [isAdapting, setIsAdapting] = useState(false);
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  const liveSessionIdRef = useRef<string | null>(null);
+
+  // Keep ref in sync so the unmount cleanup always sees the latest session ID
+  useEffect(() => {
+    liveSessionIdRef.current = liveSessionId;
+  }, [liveSessionId]);
+
+  // Clean up the Agentforce session when the user navigates away
+  useEffect(() => {
+    return () => {
+      if (liveSessionIdRef.current) {
+        void deleteAgentSession(liveSessionIdRef.current).catch(console.error);
+      }
+    };
+  }, []);
 
   const isFallback = state.isLiveFallback;
 
@@ -143,11 +159,11 @@ const LivePage = () => {
     setIsAdapting(true);
 
     try {
-      let agentSessionId = state.aiSessionId;
+      let agentSessionId = liveSessionId;
       if (!agentSessionId) {
         const res = await startAgentSession(uuidv4());
         agentSessionId = res.sessionId;
-        dispatch({ type: "SET_AI_SESSION_ID", payload: agentSessionId });
+        setLiveSessionId(agentSessionId);
       }
 
       const relevantMatchups = state.liveMatchups.filter((m) => m.round === activeRound && m.isComplete);
