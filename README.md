@@ -114,11 +114,11 @@ Key capabilities:
 
 ### Home Page
 
-![Home Page](./screenshots/homepage.png)
+![Home Page](./screenshots/home.png)
 
 ### Manual Bracket Builder
 
-![Bracket Builder](./screenshots/bracket-page.png)
+![Bracket Builder](./screenshots/manual-bracket.png)
 
 ### AI Bracket Generation (Streaming)
 
@@ -126,11 +126,11 @@ Key capabilities:
 
 ### Live Scores
 
-![Live Scores](./screenshots/live-page.png)
+![Live Scores](./screenshots/live.png)
 
 ### Head-to-Head Comparison
 
-![Compare Page](./screenshots/compare-page.png)
+![Compare Page](./screenshots/compare.png)
 
 ---
 
