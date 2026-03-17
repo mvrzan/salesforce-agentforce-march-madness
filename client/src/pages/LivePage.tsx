@@ -45,7 +45,10 @@ const LivePage = () => {
 
   const { content, isStreaming, error, stream, reset } = useSSE({
     onChunk: (chunk) => {
-      aiTextRef.current += chunk;
+      const raw = aiTextRef.current + chunk;
+      aiTextRef.current = raw
+        .replace(/(\.\.\.)(\S)/g, "$1\n\n$2")
+        .replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/gi, "$1\n\n$2");
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
         // Strip all markdown artifacts the agent may wrap around values (* ` [ ])
