@@ -49,8 +49,3 @@ export interface PickPayload {
   matchupId: string;
   winnerId: string;
 }
-
-export interface SaveBracketRequest {
-  sessionId: string;
-  picks: PickPayload[];
-}
