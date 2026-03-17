@@ -42,13 +42,17 @@ const LivePage = () => {
 
   const aiTextRef = useRef("");
   const dispatchedPicksRef = useRef<Set<string>>(new Set());
+  const [displayContent, setDisplayContent] = useState("");
 
-  const { content, isStreaming, error, stream, reset } = useSSE({
+  const { isStreaming, error, stream, reset } = useSSE({
     onChunk: (chunk) => {
-      const raw = aiTextRef.current + chunk;
-      aiTextRef.current = raw
-        .replace(/(\.\.\.)(\S)/g, "$1\n\n$2")
-        .replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/gi, "$1\n\n$2");
+      aiTextRef.current += chunk;
+      setDisplayContent((prev) => {
+        const raw = prev + chunk;
+        return raw
+          .replace(/(\.\.\.)(\S)/g, "$1\n\n$2")
+          .replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/gi, "$1\n\n$2");
+      });
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
         // Strip all markdown artifacts the agent may wrap around values (* ` [ ])
@@ -66,6 +70,7 @@ const LivePage = () => {
 
   const handleAdapt = async () => {
     reset();
+    setDisplayContent("");
     aiTextRef.current = "";
     dispatchedPicksRef.current.clear();
     setIsAdapting(true);
@@ -245,7 +250,12 @@ const LivePage = () => {
             </div>
 
             <div className="flex-1 min-h-0">
-              <ReasoningPanel content={content} isStreaming={isStreaming} error={error} title="Adaptation Reasoning" />
+              <ReasoningPanel
+                content={displayContent}
+                isStreaming={isStreaming}
+                error={error}
+                title="Adaptation Reasoning"
+              />
             </div>
           </div>
         </div>
