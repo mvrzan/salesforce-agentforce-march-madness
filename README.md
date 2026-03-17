@@ -29,7 +29,7 @@ A full-stack NCAA March Madness bracket builder where you compete head-to-head a
     - [Authentication](#authentication)
     - [Middleware](#middleware)
     - [Agentforce Session Routes](#agentforce-session-routes)
-    - [Agentforce Messaging Routes](#agentforce-messaging-routes)
+    - [Agentforce Bracket Routes](#agentforce-bracket-routes)
     - [Results Routes](#results-routes)
     - [Bracket Routes](#bracket-routes)
   - [Tech Stack](#tech-stack)
@@ -74,7 +74,7 @@ Key capabilities:
 
 - **Live ESPN Integration**: Tournament data, seedings, and live scores pulled directly from the ESPN API with in-process TTL caching
 - **Streaming AI Predictions**: Agentforce responses stream token-by-token via SSE — picks are extracted on-the-fly using regex pattern matching
-- **Adaptive AI**: After real tournament rounds complete, the AI reviews the results and adjusts its remaining predictions accordingly
+- **Adaptive AI**: After real tournament rounds complete, the AI reviews the results and adjusts its remaining predictions accordingly via `POST /api/v1/af/bracket/adapt`
 - **Head-to-Head Scoring**: Compare your bracket against the AI's bracket scored against actual ESPN results using exponential round points (1 → 2 → 4 → 8 → 16 → 32, max 192 points)
 - **Persistent State**: User picks and AI reasoning survive page navigation and refreshes via localStorage
 - **Heroku AppLink Auth**: Salesforce OAuth tokens are retrieved securely via the Heroku AppLink SDK — no credentials stored in environment variables
@@ -101,7 +101,7 @@ Key capabilities:
 2. **ESPN Cache**: The ESPN service caches bracket data for 5 minutes and live scores for 30 seconds to avoid hammering the API on low-RAM Heroku dynos
 3. **User Picks**: As users select winners, picks are saved to localStorage and periodically saved to the backend via `POST /bracket/save`
 4. **Live Polling**: The `useLivePolling` hook polls `GET /api/v1/agentforce/results/live` every N seconds to refresh scores for in-progress games
-5. **Adaptive AI**: On the Live page, the AI can review completed round results and call `POST /api/v1/af/bracket/round` again with actual outcomes to adjust remaining picks
+5. **Adaptive AI**: On the Live page, the AI can review completed round results and call `POST /api/v1/af/bracket/adapt` with actual outcomes to adjust remaining picks
 6. **Scoring**: The Compare page scores both brackets locally against real ESPN results — no additional server call needed
 
 ---
@@ -144,13 +144,13 @@ Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) 
 
 ### Middleware
 
-| Middleware          | Applies To               | Purpose                                                         |
-| ------------------- | ------------------------ | --------------------------------------------------------------- |
-| `cors`              | All routes               | Restricts browser requests to the origin set in `CLIENT_ORIGIN` |
-| `express.json`      | All routes               | Parses JSON request bodies                                      |
-| `validateSignature` | `agentforceTools` routes | HMAC-validates inbound Salesforce agent tool requests           |
-| `herokuServiceMesh` | Selected routes          | Heroku service mesh integration                                 |
-| `errorHandler`      | All routes (last)        | Centralized JSON error responses                                |
+| Middleware          | Applies To                                       | Purpose                                                                         |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `cors`              | All routes                                       | Restricts browser requests to the origin set in `CLIENT_ORIGIN`                 |
+| `express.json`      | All routes                                       | Parses JSON request bodies                                                      |
+| `validateSignature` | `agentforceApiRoutes` + `agentforceTools` routes | HMAC-validates inbound requests from the client and Salesforce agent tool calls |
+| `herokuServiceMesh` | Selected routes                                  | Heroku service mesh integration                                                 |
+| `errorHandler`      | All routes (last)                                | Centralized JSON error responses                                                |
 
 ### Agentforce Session Routes
 
@@ -170,29 +170,29 @@ Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) 
 - **Response**: `200 { message }`
 - **Error responses**: `500` if session deletion fails
 
-### Agentforce Messaging Routes
-
-**`POST /api/v1/send-streaming-message`**
-
-- **Auth required**: Yes (AppLink)
-- **Description**: Sends a message to an active Agentforce session and streams the response back as SSE
-- **Request body**: `{ sessionId: string, message: string, sequenceId: number }`
-- **Response**: `text/event-stream` — chunked SSE with `data:` lines containing agent text chunks
-- **Error responses**: `500` if Agentforce API returns a non-200 status
+### Agentforce Bracket Routes
 
 **`POST /api/v1/af/bracket/round`**
 
-- **Auth required**: Yes (AppLink)
+- **Auth required**: Yes (HMAC signature)
 - **Description**: Generates AI bracket picks for a specific round by prompting the Agentforce agent; streams picks back via SSE
-- **Request body**: `{ sessionId: string, sequenceId: number, round: string, matchups: Matchup[] }`
+- **Request body**: `{ sessionId: string, sequenceId: number, roundIndex: number, priorPicks: Record<string, string> }`
 - **Response**: `text/event-stream`
 - **Error responses**: `400` if required fields are missing, `500` on agent error
 
 **`POST /api/v1/af/bracket/retry`**
 
-- **Auth required**: Yes (AppLink)
+- **Auth required**: Yes (HMAC signature)
 - **Description**: Retries AI pick generation for specific matchups the agent previously missed
-- **Request body**: `{ sessionId: string, sequenceId: number, matchups: Matchup[] }`
+- **Request body**: `{ sessionId: string, sequenceId: number, missingMatchupIds: string[], priorPicks: Record<string, string> }`
+- **Response**: `text/event-stream`
+- **Error responses**: `400`, `500`
+
+**`POST /api/v1/af/bracket/adapt`**
+
+- **Auth required**: Yes (HMAC signature)
+- **Description**: Prompts the Agentforce agent to review actual completed-round results and adapt its remaining bracket predictions; the full prompt is built server-side to prevent prompt injection
+- **Request body**: `{ sessionId: string, sequenceId: number, round: string, completedMatchups: Matchup[], aiBracket: Bracket | null }`
 - **Response**: `text/event-stream`
 - **Error responses**: `400`, `500`
 
@@ -218,26 +218,12 @@ Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) 
 
 ### Bracket Routes
 
-**`POST /bracket/save`**
+**`POST /api/v1/bracket/save`**
 
 - **Auth required**: No
-- **Description**: Saves a user's bracket picks to the server-side in-memory store
-- **Request body**: `{ sessionId: string, picks: Record<string, string> }`
-- **Response**: `200 { message }`
-
-**`GET /bracket/:id`**
-
-- **Auth required**: No
-- **Description**: Retrieves a previously saved bracket by session ID
-- **URL params**: `id` — session ID
-- **Response**: `200 { bracket: Bracket }` or `404` if not found
-
-**`GET /bracket/:id/score`**
-
-- **Auth required**: No
-- **Description**: Scores a saved bracket against the current ESPN results
-- **URL params**: `id` — session ID
-- **Response**: `200 { score: number, breakdown: RoundScores }` or `404` if bracket not found
+- **Description**: Saves a user's bracket picks to the server-side in-memory store and returns the fully-resolved bracket
+- **Request body**: `{ sessionId: string, picks: PickPayload[] }`
+- **Response**: `200 { success: true, data: Bracket }`
 
 ---
 
