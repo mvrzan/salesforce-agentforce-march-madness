@@ -51,7 +51,6 @@ export const getLiveScores = () =>
     "/api/v1/results/live",
   );
 
-
 // ── Agentforce Session ────────────────────────────────────────────────────────
 export const startAgentSession = (sessionId: string) => {
   const path = `/api/v1/af/sessions/${sessionId}`;
