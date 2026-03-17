@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { Bot, ClipboardList, Radio, Scale, Trophy } from "lucide-react";
 import { type LucideIcon } from "lucide-react";
 
@@ -59,57 +59,59 @@ const iconColorMap: Record<string, string> = {
 };
 
 const HomePage = () => (
-  <div className="min-h-screen bg-gray-950 text-white">
-    {/* Hero */}
-    <div className="max-w-4xl mx-auto px-4 pt-20 pb-16 text-center">
-      <Trophy size={64} className="mx-auto text-orange-400 mb-4" />
-      <h1 className="text-4xl sm:text-6xl font-black tracking-tight mb-4">
-        March Madness <span className="text-orange-400">× Agentforce</span>
-      </h1>
-      <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
-        Build your bracket, pit it against an AI agent powered by Salesforce Agentforce, and watch both adapt as the
-        tournament unfolds — live, round by round.
-      </p>
-      <div className="flex flex-wrap gap-3 justify-center">
-        <Link
-          to="/bracket"
-          className="px-6 py-3 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-xl transition-colors"
-        >
-          Build My Bracket →
-        </Link>
-        <Link
-          to="/ai-bracket"
-          className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-colors border border-gray-700"
-        >
-          See AI Picks
-        </Link>
-      </div>
-    </div>
-
-    {/* Feature grid */}
-    <div className="max-w-5xl mx-auto px-4 pb-20 grid grid-cols-1 sm:grid-cols-2 gap-5">
-      {FEATURES.map(({ icon: Icon, title, description, to, cta, color }) => (
-        <div
-          key={to}
-          className={`rounded-2xl border bg-gray-900 p-6 flex flex-col gap-4 transition-all duration-200 ${colorMap[color]}`}
-        >
-          <div className="flex items-center gap-3">
-            <Icon className={iconColorMap[color]} size={28} />
-            <h2 className="text-lg font-bold text-white">{title}</h2>
-          </div>
-          <div>
-            <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
-          </div>
+  <>
+    <main className="flex-1 text-white">
+      {/* Hero */}
+      <div className="max-w-4xl mx-auto px-4 pt-20 pb-16 text-center">
+        <Trophy size={64} className="mx-auto text-orange-400 mb-4" />
+        <h1 className="text-4xl sm:text-6xl font-black tracking-tight mb-4">
+          March Madness <span className="text-orange-400">× Agentforce</span>
+        </h1>
+        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-8">
+          Build your bracket, pit it against an AI agent powered by Salesforce Agentforce, and watch both adapt as the
+          tournament unfolds — live, round by round.
+        </p>
+        <div className="flex flex-wrap gap-3 justify-center">
           <Link
-            to={to}
-            className={`mt-auto self-start px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${ctaColorMap[color]}`}
+            to="/bracket"
+            className="px-6 py-3 bg-orange-500 hover:bg-orange-400 text-white font-bold rounded-xl transition-colors"
           >
-            {cta} →
+            Build My Bracket →
+          </Link>
+          <Link
+            to="/ai-bracket"
+            className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-xl transition-colors border border-gray-700"
+          >
+            See AI Picks
           </Link>
         </div>
-      ))}
-    </div>
-  </div>
+      </div>
+
+      {/* Feature grid */}
+      <div className="max-w-5xl mx-auto px-4 pb-20 grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {FEATURES.map(({ icon: Icon, title, description, to, cta, color }) => (
+          <div
+            key={to}
+            className={`rounded-2xl border bg-gray-900 p-6 flex flex-col gap-4 transition-all duration-200 ${colorMap[color]}`}
+          >
+            <div className="flex items-center gap-3">
+              <Icon className={iconColorMap[color]} size={28} />
+              <h2 className="text-lg font-bold text-white">{title}</h2>
+            </div>
+            <div>
+              <p className="text-sm text-gray-400 leading-relaxed">{description}</p>
+            </div>
+            <Link
+              to={to}
+              className={`mt-auto self-start px-4 py-2 text-sm font-semibold text-white rounded-lg transition-colors ${ctaColorMap[color]}`}
+            >
+              {cta} →
+            </Link>
+          </div>
+        ))}
+      </div>
+    </main>
+  </>
 );
 
 export default HomePage;
