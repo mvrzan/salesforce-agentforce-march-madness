@@ -221,71 +221,73 @@ const AIBracketPage = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-12">
-      {/* Header */}
-      <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-white flex items-center gap-2">
-            <Bot size={22} className="text-orange-400" /> AI Bracket
-          </h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            Powered by Salesforce Agentforce · {sessionStatus === "active" ? "Session active" : "No session"}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {(hasGenerated || isStreaming) && !isPanelOpen && (
+    <>
+      <main className="flex-1 text-white pb-12">
+        {/* Header */}
+        <div className="max-w-screen-2xl mx-auto px-4 pt-8 pb-4 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-white flex items-center gap-2">
+              <Bot size={22} className="text-orange-400" /> AI Bracket
+            </h1>
+            <p className="text-sm text-gray-400 mt-0.5">
+              Powered by Salesforce Agentforce · {sessionStatus === "active" ? "Session active" : "No session"}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {(hasGenerated || isStreaming) && !isPanelOpen && (
+              <button
+                onClick={() => setIsPanelOpen(true)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
+              >
+                <Bot size={14} />
+                Show Reasoning
+              </button>
+            )}
             <button
-              onClick={() => setIsPanelOpen(true)}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors text-sm flex items-center gap-2"
+              onClick={handleGenerate}
+              disabled={isGenerating || isStreaming}
+              className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm flex items-center gap-2"
             >
-              <Bot size={14} />
-              Show Reasoning
+              {(isGenerating || isStreaming) && <RefreshCw size={14} className="animate-spin" />}
+              {isGenerating || isStreaming ? "Generating..." : hasGenerated ? "Regenerate" : "Generate AI Bracket"}
             </button>
-          )}
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating || isStreaming}
-            className="px-5 py-2 bg-orange-500 hover:bg-orange-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-sm flex items-center gap-2"
-          >
-            {(isGenerating || isStreaming) && <RefreshCw size={14} className="animate-spin" />}
-            {isGenerating || isStreaming ? "Generating..." : hasGenerated ? "Regenerate" : "Generate AI Bracket"}
-          </button>
+          </div>
         </div>
-      </div>
 
-      {/* Bracket – full width */}
-      <div className="max-w-screen-2xl mx-auto px-4">
-        {hasGenerated || isGenerating ? (
-          state.aiBracket ? (
-            <BracketTree bracket={state.aiBracket} realBracket={state.realBracket} isReadOnly label="AI Picks" />
-          ) : (
-            <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
-              <div className="text-center">
-                <Bot size={36} className="mx-auto mb-3 text-orange-400 animate-bounce" />
-                <div>Agentforce is analyzing the bracket...</div>
+        {/* Bracket – full width */}
+        <div className="max-w-screen-2xl mx-auto px-4">
+          {hasGenerated || isGenerating ? (
+            state.aiBracket ? (
+              <BracketTree bracket={state.aiBracket} realBracket={state.realBracket} isReadOnly label="AI Picks" />
+            ) : (
+              <div className="flex items-center justify-center h-48 text-gray-500 text-sm">
+                <div className="text-center">
+                  <Bot size={36} className="mx-auto mb-3 text-orange-400 animate-bounce" />
+                  <div>Agentforce is analyzing the bracket...</div>
+                </div>
               </div>
+            )
+          ) : (
+            <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
+              Click &quot;Generate AI Bracket&quot; to let Agentforce analyze the field
             </div>
-          )
-        ) : (
-          <div className="flex items-center justify-center h-48 text-gray-600 text-sm">
-            Click &quot;Generate AI Bracket&quot; to let Agentforce analyze the field
+          )}
+        </div>
+
+        {/* Reasoning panel – fixed right overlay, never squeezes the bracket */}
+        {isPanelOpen && (
+          <div className="fixed right-0 top-14 bottom-0 w-96 z-40 flex flex-col shadow-2xl">
+            <ReasoningPanel
+              content={allContent}
+              isStreaming={isStreaming}
+              error={error}
+              title="Agentforce Reasoning"
+              onClose={() => setIsPanelOpen(false)}
+            />
           </div>
         )}
-      </div>
-
-      {/* Reasoning panel – fixed right overlay, never squeezes the bracket */}
-      {isPanelOpen && (
-        <div className="fixed right-0 top-14 bottom-0 w-96 z-40 flex flex-col shadow-2xl">
-          <ReasoningPanel
-            content={allContent}
-            isStreaming={isStreaming}
-            error={error}
-            title="Agentforce Reasoning"
-            onClose={() => setIsPanelOpen(false)}
-          />
-        </div>
-      )}
-    </div>
+      </main>
+    </>
   );
 };
 
