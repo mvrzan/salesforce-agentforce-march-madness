@@ -76,11 +76,15 @@ const AIBracketPage = () => {
   const { isStreaming, error, stream, reset } = useSSE({
     onChunk: (chunk) => {
       aiTextRef.current += chunk;
-      // Keep accumulated display content in sync (never wiped between rounds)
+      // Keep accumulated display content in sync (never wiped between rounds).
+      // Normalize so PICK/REASON/UPSET ALERT always start on their own line —
+      // the server can send them immediately after a status string like
+      // "Getting bracket structure...PICK: ..." with no newline in between.
       setAllContent((prev) => {
-        const next = prev + chunk;
-        localStorage.setItem(REASONING_STORAGE_KEY, next);
-        return next;
+        const raw = prev + chunk;
+        const normalized = raw.replace(/([^\n])((?:PICK|UPSET\s+ALERT|REASON):)/g, "$1\n$2");
+        localStorage.setItem(REASONING_STORAGE_KEY, normalized);
+        return normalized;
       });
       const matches = [...aiTextRef.current.matchAll(PICK_PATTERN)];
       for (const match of matches) {
