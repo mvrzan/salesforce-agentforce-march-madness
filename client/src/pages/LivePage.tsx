@@ -227,10 +227,11 @@ const LivePage = () => {
             <div className="flex items-start gap-3 bg-amber-950/40 border border-amber-700/50 rounded-xl px-4 py-3">
               <CalendarClock size={18} className="text-amber-400 mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-semibold text-amber-300">Tournament not active</p>
+                <p className="text-sm font-semibold text-amber-300">No live games right now</p>
                 <p className="text-xs text-amber-500 mt-0.5">
-                  Showing 2025 NCAA tournament results. Live tracking will begin automatically when the 2026 tournament
-                  starts in March.
+                  The {new Date().getFullYear()} NCAA Tournament bracket is loaded, but no games are currently in
+                  progress. Live tracking activates automatically once games tip off — this page refreshes every 30
+                  seconds.
                 </p>
               </div>
             </div>
