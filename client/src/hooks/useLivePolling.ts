@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { getLiveScores } from "../services/api";
 import { useBracket } from "../context/BracketContext";
 
@@ -8,7 +8,7 @@ export const useLivePolling = (enabled = true) => {
   const { dispatch } = useBracket();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchScores = async () => {
+  const fetchScores = useCallback(async () => {
     try {
       const res = await getLiveScores();
       if (res.success) {
@@ -17,18 +17,18 @@ export const useLivePolling = (enabled = true) => {
     } catch (err) {
       console.error("Live polling error:", err);
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     if (!enabled) return;
 
-    fetchScores();
-    timerRef.current = setInterval(fetchScores, POLL_INTERVAL_MS);
+    void fetchScores();
+    timerRef.current = setInterval(() => void fetchScores(), POLL_INTERVAL_MS);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [enabled]);
+  }, [enabled, fetchScores]);
 
   return { refresh: fetchScores };
 };
