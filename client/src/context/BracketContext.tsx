@@ -38,7 +38,6 @@ interface BracketState {
   liveMatchups: Matchup[];
   isLiveFallback: boolean;
   sessionId: string;
-  aiSessionId: string | null;
   userPicks: PickPayload[];
   aiPicks: PickPayload[];
   isLoadingBracket: boolean;
@@ -53,7 +52,6 @@ type BracketAction =
   | { type: "RESET_AI_BRACKET" }
   | { type: "ADD_AI_PICK"; payload: PickPayload }
   | { type: "SET_LIVE_MATCHUPS"; payload: { matchups: Matchup[]; isFallback: boolean } }
-  | { type: "SET_AI_SESSION_ID"; payload: string }
   | { type: "ADD_PICK"; payload: PickPayload }
   | { type: "RESET_USER_BRACKET" }
   | { type: "SET_LOADING_BRACKET"; payload: boolean }
@@ -176,7 +174,6 @@ const initialState: BracketState = {
   liveMatchups: [],
   isLiveFallback: false,
   sessionId: getOrCreateSessionId(),
-  aiSessionId: null,
   userPicks: loadStoredPicks(),
   aiPicks: loadStoredAiPicks(),
   isLoadingBracket: false,
@@ -247,8 +244,6 @@ const bracketReducer = (state: BracketState, action: BracketAction): BracketStat
     }
     case "SET_LIVE_MATCHUPS":
       return { ...state, liveMatchups: action.payload.matchups, isLiveFallback: action.payload.isFallback };
-    case "SET_AI_SESSION_ID":
-      return { ...state, aiSessionId: action.payload };
     case "ADD_PICK": {
       const updatedPicks = [...state.userPicks.filter((p) => p.matchupId !== action.payload.matchupId), action.payload];
       const updatedBracket = state.userBracket ? applyPickToLocal(state.userBracket, action.payload) : null;
