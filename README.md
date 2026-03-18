@@ -41,6 +41,7 @@ A full-stack NCAA March Madness bracket builder where you compete head-to-head a
   - [Salesforce Agentforce Configuration](#salesforce-agentforce-configuration)
     - [Agent Setup](#agent-setup)
     - [Agent Tools](#agent-tools)
+    - [Agent Details](#agent-details)
   - [Deployment](#deployment)
     - [1. Set Configuration Variables](#1-set-configuration-variables)
     - [2. Deploy](#2-deploy)
@@ -137,7 +138,7 @@ Key capabilities:
 
 ### Authentication
 
-All Agentforce-facing routes authenticate via [Heroku AppLink](https://devcenter.heroku.com/articles/applink). The backend SDK (`@heroku/applink`) retrieves a short-lived Salesforce OAuth access token at request time using the `APP_LINK_CONNECTION_NAME` attachment. No token is stored in environment variables.
+All Agentforce-facing routes authenticate via [Heroku AppLink](https://devcenter.heroku.com/articles/heroku-applink). The backend SDK (`@heroku/applink`) retrieves a short-lived Salesforce OAuth access token at request time using the `APP_LINK_CONNECTION_NAME` attachment. No token is stored in environment variables.
 
 Inbound requests from Salesforce (tool invocations on `agentforceTools` routes) are validated using HMAC signature verification against the `API_SECRET` shared secret. Invalid signatures return `401 Unauthorized`.
 
@@ -257,7 +258,7 @@ To run this application locally, you will need the following:
 
    > **Important**: You must have a Salesforce org with Agentforce enabled before proceeding.
 
-   Follow the [Agentforce documentation](https://help.salesforce.com/s/articleView?id=sf.agentforce_setup.htm) to:
+   Follow the [Agentforce documentation](https://help.salesforce.com/s/articleView?id=ai.agent_setup_create.htm&type=5) to:
    - Create and deploy an Agentforce agent in your Salesforce org
    - Note the **Agent ID** from the agent's detail page — you will need it for `AGENTFORCE_AGENT_ID`
 
@@ -265,7 +266,7 @@ To run this application locally, you will need the following:
 
    > **Important**: Heroku AppLink is required for the backend to authenticate with Salesforce. It does not work with a plain `.env` file in production.
 
-   Follow the [Heroku AppLink setup guide](https://devcenter.heroku.com/articles/applink) to:
+   Follow the [Heroku AppLink setup guide](https://devcenter.heroku.com/articles/getting-started-heroku-applink-agentforce) to:
    - Attach the AppLink add-on to your Heroku app
    - Connect the add-on to your Salesforce org
    - Note the **connection name** — this is your `APP_LINK_CONNECTION_NAME` value
@@ -351,15 +352,66 @@ To run this application locally, you will need the following:
 
 ### Agent Setup
 
-The application communicates with Agentforce using the [Einstein AI Agent Sessions API](https://developer.salesforce.com/docs/einstein/genai/references/ai-agent-sessions-api-overview). Your Agentforce agent must be:
+Your Agentforce agent must be:
 
 - Published and active in your Salesforce org
 - Accessible by the AppLink-connected user profile
 - Configured with appropriate knowledge sources (Data360 recommended for team statistics and historical NCAA data)
+- Ensure your Agentforce Actions are using the Heroku AppLink as described [here](https://devcenter.heroku.com/articles/getting-started-heroku-applink-agentforce?singlepage=true#create-an-agentforce-action).
 
 ### Agent Tools
 
 The server exposes tool endpoints under `agentforceTools` routes that Salesforce agents can call back into the application. These endpoints are protected by HMAC signature validation using the shared `API_SECRET`.
+
+### Agent Details
+
+| Field         | Value                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**      | March Madness Bracket Analyst                                                                                                                                                         |
+| **Description** | This is the March Madness Bracket Analyst agent that analyzes the scores and provides suggestions accordingly.                                                                      |
+| **Role**      | You are a March Madness Bracket Analyst powered by Salesforce Agentforce. Your job is to analyze the NCAA Men's Basketball Tournament field, generate data-driven bracket predictions, and adapt your picks in real time as the tournament unfolds. |
+| **Company**   | This is just a demo Agent that analyzes the scores of march madness and provides suggestions accordingly.                                                                             |
+
+#### Topic: Bracket Generation
+
+| Field                    | Value                                                                                                                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**                 | Bracket Generation                                                                                                                                                     |
+| **Classification Description** | Analyzing the full 64-team field and predicting winners through all 6 rounds of the tournament.                                                                |
+| **Scope**                | My job is to analyze the 64-team field, evaluate matchups, and predict winners for each of the 6 rounds in the tournament. I will not handle tasks outside of bracket analysis or predictions. |
+
+#### Agent Instructions
+
+1. Always explain your reasoning for each pick citing seed, record, region strength, and historical tournament performance.
+
+2. When making bracket picks, output each pick on its own line in this exact format: `PICK: MATCHUP_ID -> TEAM_ABBREVIATION` followed by `REASON: One sentence`. Use the exact `MATCHUP_ID` and `TEAM_ABBREVIATION` values from the bracket data. Do not use markdown bold, asterisks, backticks, or brackets around pick values.
+
+3. Work through regions in order: East → West → South → Midwest → Final Four → Championship.
+
+4. Flag upset picks explicitly with `UPSET ALERT:` when picking a seed 5 or lower over a seed 4 or higher.
+
+5. When providing bracket picks, you MUST follow this exact format for every single pick — no exceptions:
+   ```
+   PICK: [MATCHUP_ID] -> [TEAM_ABBREVIATION]
+   REASON: [One sentence explanation]
+   ```
+   Rules:
+   - Use ONLY the keyword `PICK:` — never `UPSET ALERT:`, `PREDICTION:`, or any other prefix
+   - `MATCHUP_ID` must be exactly as returned by the Get Bracket Structure action (e.g. `East-R64-1v16`, `Midwest-Roundof32-1`, `FF-1`, `CHAMP-1`)
+   - `TEAM_ABBREVIATION` must be exactly as returned by the Get Bracket Structure action (e.g. `DUKE`, `HOU`, `GONZ`)
+   - One `PICK` line per matchup, on its own line
+   - Do not use markdown bold (`**`), bullet points, or any other formatting on the `PICK` lines themselves
+   - You may use headers and prose between PICK blocks, but each PICK line must be clean and unformatted
+
+   Example:
+   ```
+   PICK: East-R64-1v16 -> DUKE
+   REASON: Duke dominates as a #1 seed against Mount St. Mary's.
+   PICK: Midwest-Roundof32-1 -> HOU
+   REASON: Houston advances on balanced scoring and elite defense.
+   ```
+
+6. You are making PREDICTIONS for an entire bracket before any games are played. You MUST pick every single matchup in every round — Round of 64 through Championship — regardless of whether results exist. For rounds beyond Round of 64, determine the expected participants by picking the winner of each prior matchup based on seeding, historical performance, and your own analysis. Then make a pick for that matchup. Never refuse to pick a matchup because results are unknown. That is the entire point — you are predicting, not reporting. If no winner has been recorded, project one yourself and continue.
 
 ---
 
