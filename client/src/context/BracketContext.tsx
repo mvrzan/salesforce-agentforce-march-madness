@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
-import { type Bracket, type PickPayload, type Matchup, type Team, ROUND_ORDER } from "../types/tournament";
+import { type Bracket, type PickPayload, type Matchup, type Team, type Region, ROUND_ORDER } from "../types/tournament";
 
 const STORAGE_KEY_SESSION = "mm-session-id";
 const STORAGE_KEY_PICKS = "mm-user-picks";
@@ -134,6 +134,13 @@ const resolveWinner = (topTeam: Team | null, bottomTeam: Team | null, winnerId: 
   return byShort ?? null;
 };
 
+// 2025 Final Four pairings: [topRegion, bottomRegion] for [FF-1, FF-2]
+// FF-1: West vs South, FF-2: Midwest vs East
+const FF_PAIRINGS: [Region, Region][] = [
+  ["West", "South"],
+  ["Midwest", "East"],
+];
+
 const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
   const rounds = bracket.rounds.map((r) => ({
     ...r,
@@ -152,10 +159,26 @@ const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
       if (matchup.id.toLowerCase() !== pick.matchupId.toLowerCase() || !matchup.winner) return;
       const nextRound = updated.rounds[ri + 1];
       if (!nextRound) return;
+      const winner = matchup.winner as Team;
+
+      // E8→FF: use region-based pairing instead of index math so the correct regions
+      // are matched up regardless of their position in the matchups array.
+      if (round.round === "Elite 8") {
+        const region = matchup.region as Region;
+        const ffIdx = FF_PAIRINGS.findIndex(([top, bot]) => top === region || bot === region);
+        if (ffIdx === -1) return;
+        const nextMatchup = nextRound.matchups[ffIdx];
+        if (!nextMatchup) return;
+        const isTop = FF_PAIRINGS[ffIdx]![0] === region;
+        nextRound.matchups[ffIdx] = isTop
+          ? { ...nextMatchup, topTeam: { ...winner } }
+          : { ...nextMatchup, bottomTeam: { ...winner } };
+        return;
+      }
+
       const nextMatchupIdx = Math.floor(mi / 2);
       const nextMatchup = nextRound.matchups[nextMatchupIdx];
       if (!nextMatchup) return;
-      const winner = matchup.winner as Team;
       if (mi % 2 === 0) {
         nextRound.matchups[nextMatchupIdx] = { ...nextMatchup, topTeam: { ...winner } };
       } else {
