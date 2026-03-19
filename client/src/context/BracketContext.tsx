@@ -134,11 +134,12 @@ const resolveWinner = (topTeam: Team | null, bottomTeam: Team | null, winnerId: 
   return byShort ?? null;
 };
 
-// 2025 Final Four pairings: [topRegion, bottomRegion] for [FF-1, FF-2]
-// FF-1: West vs South, FF-2: Midwest vs East
+// Final Four pairings: [topRegion, bottomRegion] for [FF-1, FF-2]
+// Matches the visual bracket layout: East + South on the left side → FF-1,
+// Midwest + West on the right side → FF-2.
 const FF_PAIRINGS: [Region, Region][] = [
-  ["West", "South"],
-  ["Midwest", "East"],
+  ["East", "South"],
+  ["Midwest", "West"],
 ];
 
 const applyPickToLocal = (bracket: Bracket, pick: PickPayload): Bracket => {
