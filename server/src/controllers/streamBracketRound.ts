@@ -151,10 +151,11 @@ const buildPrompt = async (roundIndex: number, priorPicks: Record<string, string
   }
 
   // Final Four + Championship (index 7)
-  // 2025 bracket draw: FF-1 = West vs South, FF-2 = Midwest vs East
+  // Bracket layout: East + South (left side) → FF-1, Midwest + West (right side) → FF-2.
+  // Championship is always winner of FF-1 (East/South) vs winner of FF-2 (Midwest/West).
   const FF_REGION_PAIRS: [string, string][] = [
-    ["West", "South"],
-    ["Midwest", "East"],
+    ["East", "South"],
+    ["Midwest", "West"],
   ];
   const getE8Id = (region: string) => e8Round?.matchups.find((m) => m.region === region)?.id ?? `${region}-Elite8-1`;
   const ffMatchups = ffRound?.matchups ?? [];
