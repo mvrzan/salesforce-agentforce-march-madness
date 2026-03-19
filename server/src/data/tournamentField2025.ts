@@ -174,11 +174,13 @@ export const RESULTS_2025: Record<string, string> = {
   "Midwest-Elite8-1": "248", // Houston 69, Tennessee 50
 
   // === FINAL FOUR ===
-  "FF-1": "57", // Florida 79, Auburn 73  (West 1 vs South 1)
-  "FF-2": "248", // Houston 70, Duke 67    (Midwest 1 vs East 1)
+  // Under East/South + Midwest/West bracket structure:
+  // FF-1 (East vs South): Duke(East) vs Auburn(South) — Duke never played Auburn in 2025; no result.
+  // FF-2 (Midwest vs West): Houston(Midwest) vs Florida(West) — Florida won (actual 2025 Championship game).
+  "FF-2": "57", // Florida beat Houston (Midwest vs West = actual 2025 Championship matchup)
 
   // === CHAMPIONSHIP ===
-  "CHAMP-1": "57", // Florida 65, Houston 63
+  "CHAMP-1": "57", // Florida — 2025 National Champion
 };
 
 export const buildTeamFromStaticEntry = (entry: (typeof TOURNAMENT_FIELD_2025)[number]): Team => ({
@@ -336,15 +338,16 @@ export const buildStaticBracket = (): Bracket => {
   }
 
   // E8 winners → Final Four
-  // NCAA bracket pairing: South vs West → FF-1, East vs Midwest → FF-2
-  const southE8 = byId.get("South-Elite8-1")?.winner;
-  const westE8 = byId.get("West-Elite8-1")?.winner;
+  // Visual layout: East + South (left side) → FF-1, Midwest + West (right side) → FF-2.
+  // East is top-left, South is bottom-left, Midwest is top-right, West is bottom-right.
   const eastE8 = byId.get("East-Elite8-1")?.winner;
+  const southE8 = byId.get("South-Elite8-1")?.winner;
   const midwestE8 = byId.get("Midwest-Elite8-1")?.winner;
-  if (southE8) setSlot("FF-1", "topTeam", southE8);
-  if (westE8) setSlot("FF-1", "bottomTeam", westE8);
-  if (eastE8) setSlot("FF-2", "topTeam", eastE8);
-  if (midwestE8) setSlot("FF-2", "bottomTeam", midwestE8);
+  const westE8 = byId.get("West-Elite8-1")?.winner;
+  if (eastE8) setSlot("FF-1", "topTeam", eastE8);
+  if (southE8) setSlot("FF-1", "bottomTeam", southE8);
+  if (midwestE8) setSlot("FF-2", "topTeam", midwestE8);
+  if (westE8) setSlot("FF-2", "bottomTeam", westE8);
 
   // FF winners → Championship
   const ff1Winner = byId.get("FF-1")?.winner;
