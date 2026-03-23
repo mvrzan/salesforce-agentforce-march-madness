@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 const REQUIRED_ENV_VARS = ["APP_LINK_CONNECTION_NAME", "AGENTFORCE_AGENT_ID", "API_SECRET"] as const;
 
 type RequiredEnvVar = (typeof REQUIRED_ENV_VARS)[number];
